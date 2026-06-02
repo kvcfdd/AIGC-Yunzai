@@ -268,18 +268,10 @@ export class AigcFallback extends plugin {
     const systemPrompt = `你的名字叫${cfg.aigc?.bot_name || "AIGC Bot"}，${cfg.aigc?.system_prompt || "You are an intelligent chatbot assistant."}`
       + (cfg.aigc?.split_reply ? `如果你想要一次回复多条消息，请使用 <x><x><x> 分割文本，例如：第一条消息内容<x><x><x>第二条消息内容<x><x><x>第三条消息内容，系统会帮你分为3条消息依次发送。` : "")
 
-    const thinkingRule = [
-      "## Thinking format (IMPORTANT)",
-      "You MUST follow this output format for EVERY reply:",
-      "1. Put ALL your reasoning, analysis, and chain-of-thought inside <think>...</think> tags.",
-      "2. Put the actual text you want to show to the user AFTER the </think> closing tag.",
-      "3. The content inside <think> tags is hidden from the user — it is only used internally for logging. Do NOT put user-visible content inside <think>."
-    ].join("\n")
-
     const timeStr = formatDate(new Date(), "full")
     const toolRules = "You may call tools for up to 4 consecutive rounds. After that, stop calling tools and reply to the user based on the information you already have, even if incomplete."
     const parts = [
-      `${systemPrompt}Current time: ${timeStr}. Take timeliness into account when answering.\n${thinkingRule}\n${toolRules}`,
+      `${systemPrompt}Current time: ${timeStr}. Take timeliness into account when answering.${toolRules}`,
     ]
 
     const memCtx = await Bot.aigc.memory.toContext(this.e.user_id)
@@ -408,6 +400,17 @@ export class AigcFallback extends plugin {
     return this._splitReply(text)
   }
 
+  /** 从 provider 响应构建待持久化的 assistant 消息 */
+  _buildAssistantMsg(res) {
+    return {
+      role: "assistant",
+      content: res.content || null,
+      ...(res.tool_calls && { tool_calls: res.tool_calls }),
+      ...(res.reasoning_content && { reasoning_content: res.reasoning_content }),
+      ...(res.reasoning_parts && { reasoning_parts: res.reasoning_parts }),
+    }
+  }
+
   /** 工具调用循环：LLM 回复 → tool_calls 则执行并回传 → 文本则发送并退出。
    *  整轮对话在内存中累积，最终回复生成后才原子写入缓存，避免中途死机留下残缺记录。 */
   async _replyLoop(sessionKey, userMsg, images) {
@@ -447,12 +450,7 @@ export class AigcFallback extends plugin {
           pending.push({ role: "user", content: userMsg, time: Date.now(), ...(images ? { images } : {}) })
           userPushed = true
         }
-        pending.push({
-          role: "assistant",
-          content: res.content || null,
-          tool_calls: res.tool_calls,
-          ...(res.reasoning_content && { reasoning_content: res.reasoning_content }),
-        })
+        pending.push(this._buildAssistantMsg(res))
 
         const results = await tools().executeAll(res.tool_calls, {
           user_id: this.e.user_id,
@@ -472,11 +470,7 @@ export class AigcFallback extends plugin {
           pending.push({ role: "user", content: userMsg, time: Date.now(), ...(images ? { images } : {}) })
           userPushed = true
         }
-        pending.push({
-          role: "assistant",
-          content: res.content,
-          ...(res.reasoning_content && { reasoning_content: res.reasoning_content }),
-        })
+        pending.push(this._buildAssistantMsg(res))
 
         await con().appendMessages(sessionKey, pending)
 
@@ -507,11 +501,7 @@ export class AigcFallback extends plugin {
       if (!userPushed) {
         pending.push({ role: "user", content: userMsg, time: Date.now(), ...(images ? { images } : {}) })
       }
-      pending.push({
-        role: "assistant",
-        content: finalReply.content,
-        ...(finalReply.reasoning_content && { reasoning_content: finalReply.reasoning_content }),
-      })
+      pending.push(this._buildAssistantMsg(finalReply))
       await con().appendMessages(sessionKey, pending)
       log.warn(`工具轮次超限，降级回复成功`)
       return this._sendReply(finalReply.content)
