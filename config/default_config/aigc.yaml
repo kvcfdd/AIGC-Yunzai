@@ -8,15 +8,15 @@ provider: openai
 openai:
   endpoint: https://api.openai.com # 可替换为兼容 OpenAI API 的其他服务地址
   api_key: "" # 多 Key 用英文逗号分隔，如 "sk-xxx,sk-yyy"
-  model: gpt-4o-mini # 模型，多模型用英文逗号分隔
+  model: gpt-4o-mini # 模型，多模型用英文逗号分隔 (不建议)
   thinking_effort: "" # 思考等级，留空=关闭思考，按提供商要求填写
 
 # Google Gemini
 gemini:
   endpoint: https://generativelanguage.googleapis.com # 可替换为兼容 Google Gemini API 的反代地址
   api_key: "" # 多 Key 用英文逗号分隔，如 "xxx,yyy"
-  model: gemini-3.5-flash,gemini-3-flash-preview # 模型，多模型用英文逗号分隔
-  thinking_level: high # 思考等级 minimal, low, medium, high
+  model: gemini-3.5-flash,gemini-3-flash-preview # 模型，多模型用英文逗号分隔 (不建议3系以前的模型)
+  thinking_level: minimal # 思考等级 minimal, low, medium, high
 
 # 输出最大长度
 max_tokens: 2048
