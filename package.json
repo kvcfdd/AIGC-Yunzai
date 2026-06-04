@@ -45,7 +45,8 @@
     "ulid": "^3.0.2",
     "undici": "^8.3.0",
     "ws": "^8.20.1",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.0",
+    "marked": "^18.0.4"
   },
   "devDependencies": {
     "prettier": "^3.8.3"
