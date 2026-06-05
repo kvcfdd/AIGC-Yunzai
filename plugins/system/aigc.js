@@ -21,9 +21,10 @@ export class AigcFallback extends plugin {
       rule: [
         { reg: /^#关闭aigc$/i, fnc: "aigcOff" },
         { reg: /^#开启aigc$/i, fnc: "aigcOn" },
-        { reg: /^#结束对话$/i, fnc: "clearMemory" },
-        { reg: /^#清除记忆$/i, fnc: "clearMemory" },
-        { reg: /^#结束全部对话$/i, fnc: "clearAllMemory", permission: "master" },
+        { reg: /^#结束对话$/i, fnc: "clearConv" },
+        { reg: /^#清除记忆$/i, fnc: "clearConvAndMem" },
+        { reg: /^#结束全部对话$/i, fnc: "clearAllConv", permission: "master" },
+        { reg: /^#清除全部记忆$/i, fnc: "clearAllConvAndMem", permission: "master" },
         { reg: /^#知识库添加(.+)$/i, fnc: "kbAdd" },
         { reg: /^#知识库删除\s*(\S+)$/i, fnc: "kbRemove" },
         { reg: /^#知识库列表$/i, fnc: "kbList" },
@@ -90,7 +91,6 @@ export class AigcFallback extends plugin {
   }
 
   // 全局开关
-
   async aigcOff() {
     if (!this.e.isMaster) return false
     await runtime.setEnable(false)
@@ -104,34 +104,41 @@ export class AigcFallback extends plugin {
   }
 
   // 记忆 / 对话清除
+  async clearConv() {
+    const key = con().sessionKey(this.e.self_id, this.e.user_id)
+    const msgs = await con().getMessages(key)
+    if (!msgs.length) return this.reply("暂无对话记录", true)
 
-  async clearMemory() {
-    const key = con().sessionKey(
-      this.e.self_id,
-      this.e.user_id,
-      this.e.isGroup ? this.e.group_id : "",
-    )
+    await con().clearSession(key)
+    log.info(`用户 ${this.e.user_id} 清除了对话记录`)
+    return this.reply("对话记录已清除", true)
+  }
+
+  async clearConvAndMem() {
+    const key = con().sessionKey(this.e.self_id, this.e.user_id)
     const mems = await Bot.aigc.memory.getAll(this.e.user_id)
     const msgs = await con().getMessages(key)
-    const hasMem = Object.keys(mems).length > 0
-    const hasConv = msgs.length > 0
+    if (!Object.keys(mems).length && !msgs.length) return this.reply("暂无对话记录和记忆", true)
 
     await Bot.aigc.memory.clear(this.e.user_id)
     await con().clearSession(key)
-
-    if (hasMem || hasConv) {
-      log.info(`用户 ${this.e.user_id} 清除了会话`)
-      return this.reply("AIGC记忆已清除", true)
-    }
-    return this.reply("暂无记忆缓存", true)
+    log.info(`用户 ${this.e.user_id} 清除了对话记录和记忆`)
+    return this.reply("对话记录和记忆已清除", true)
   }
 
-  async clearAllMemory() {
+  async clearAllConv() {
+    if (!this.e.isMaster) return false
+    await con().clearAll()
+    log.info("管理员清除了全部用户的对话记录")
+    return this.reply("已清除全部用户的对话记录", true)
+  }
+
+  async clearAllConvAndMem() {
     if (!this.e.isMaster) return false
     await Bot.aigc.memory.clearAll()
     await con().clearAll()
-    log.info("管理员清除了全部用户的记忆和会话")
-    return this.reply("已清除全部用户的记忆与对话缓存", true)
+    log.info("管理员清除了全部用户的对话记录和记忆")
+    return this.reply("已清除全部用户的对话记录和记忆", true)
   }
 
   // 知识库管理
@@ -240,11 +247,7 @@ export class AigcFallback extends plugin {
     if (await redis.get(lockKey)) return false
     await redis.set(lockKey, "1", { EX: 300 })
 
-    const key = con().sessionKey(
-      this.e.self_id,
-      this.e.user_id,
-      this.e.isGroup ? this.e.group_id : "",
-    )
+    const key = con().sessionKey(this.e.self_id, this.e.user_id)
 
     log.info(`用户 ${this.e.user_id} 发起对话`)
 
@@ -506,19 +509,12 @@ export class AigcFallback extends plugin {
       return
     }
 
-    if (!userPushed) {
-      pending.push({ role: "user", content: userMsg, time: Date.now(), ...(images ? { images } : {}) })
-      userPushed = true
-    }
-    const stopHint = `\n\n[系统提示] 你已达到最大工具调用轮次 (${MAX_TOOL_ROUNDS}轮)。请立即基于已获取的所有信息回复用户，不要再调用任何工具。如果信息不足，如实说明已掌握的情况即可。`
-    const finalMessages = [...baseMessages, ...pending]
-    const lastRole = finalMessages[finalMessages.length - 1]?.role
-    if (lastRole === "user") {
-      const last = finalMessages[finalMessages.length - 1]
-      finalMessages[finalMessages.length - 1] = { ...last, content: (last.content || "") + stopHint }
-    } else {
-      finalMessages.push({ role: "user", content: stopHint })
-    }
+    // 第 0 轮 tool_calls 已设 userPushed=true，pending 末尾恒为 tool → 直接追加 hint
+    const finalMessages = [
+      ...baseMessages,
+      ...pending,
+      { role: "user", content: `\n\n[系统提示] 你已达到最大工具调用轮次 (${MAX_TOOL_ROUNDS}轮)。请立即基于已获取的所有信息回复用户，不要再调用任何工具。如果信息不足，如实说明已掌握的情况即可。` },
+    ]
     const finalOpts = {}
     const finalToolDefs = tools().getDefinitions()
     if (finalToolDefs.length) {
@@ -531,6 +527,24 @@ export class AigcFallback extends plugin {
       await con().appendMessages(sessionKey, pending)
       log.warn(`工具轮次超限，降级回复成功`)
       return this._sendReply(finalReply.content)
+    }
+    // LLM 忽略提示仍调工具：执行后强制不再带 tools 请求一次
+    if (finalReply.tool_calls?.length) {
+      const results = await tools().executeAll(finalReply.tool_calls, { user_id: this.e.user_id, event: this.e })
+      pending.push(this._buildAssistantMsg(finalReply))
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i]
+        const callId = finalReply.tool_calls[i]?.id || `call_${i}`
+        const payload = "error" in r ? r.error : r.result
+        pending.push({ role: "tool", content: JSON.stringify(payload ?? ""), tool_call_id: callId })
+      }
+      // 用包含工具结果的 pending 重新请求，不带 tools 强制文本回复
+      const forcedReply = await Bot.aigc.provider.chat([...baseMessages, ...pending], {})
+      if (forcedReply.content) {
+        pending.push(this._buildAssistantMsg(forcedReply))
+        await con().appendMessages(sessionKey, pending)
+        return this._sendReply(forcedReply.content)
+      }
     }
 
     log.error(`全部失败`)
