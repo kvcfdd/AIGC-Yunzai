@@ -481,7 +481,8 @@ export class AigcFallback extends plugin {
           const r = results[i]
           const callId = res.tool_calls[i]?.id || `call_${i}`
           const payload = "error" in r ? r.error : r.result
-          pending.push({ role: "tool", content: JSON.stringify(payload ?? ""), tool_call_id: callId })
+          const content = typeof payload === "string" ? payload : JSON.stringify(payload ?? "")
+          pending.push({ role: "tool", content, tool_call_id: callId })
         }
         continue
       }
@@ -536,7 +537,8 @@ export class AigcFallback extends plugin {
         const r = results[i]
         const callId = finalReply.tool_calls[i]?.id || `call_${i}`
         const payload = "error" in r ? r.error : r.result
-        pending.push({ role: "tool", content: JSON.stringify(payload ?? ""), tool_call_id: callId })
+        const content = typeof payload === "string" ? payload : JSON.stringify(payload ?? "")
+        pending.push({ role: "tool", content, tool_call_id: callId })
       }
       // 用包含工具结果的 pending 重新请求，不带 tools 强制文本回复
       const forcedReply = await Bot.aigc.provider.chat([...baseMessages, ...pending], {})
