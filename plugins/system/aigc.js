@@ -417,6 +417,7 @@ export class AigcFallback extends plugin {
     const baseMessages = await con().getMessages(sessionKey)
     const pending = []
     let userPushed = false
+    const calledTools = new Set()
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       const messages = [...baseMessages, ...pending]
@@ -452,10 +453,27 @@ export class AigcFallback extends plugin {
         }
         pending.push(this._buildAssistantMsg(res))
 
-        const results = await tools().executeAll(res.tool_calls, {
-          user_id: this.e.user_id,
-          event: this.e,
-        })
+        const ctx = { user_id: this.e.user_id, event: this.e }
+        const results = await Promise.all(res.tool_calls.map(async tc => {
+          try {
+            const fnName = tc?.function?.name
+            if (!fnName) return { name: "unknown", error: "tool_calls missing function.name" }
+            let args = {}
+            try { args = JSON.parse(tc?.function?.arguments || "{}") } catch { /* pass */ }
+            if (!args || typeof args !== "object") args = {}
+            if (Object.keys(args).length > 0) {
+              const callKey = `${fnName}:${JSON.stringify(args, Object.keys(args).sort())}`
+              if (calledTools.has(callKey)) {
+                log.warn(`重复工具调用已拦截: ${callKey}`)
+                return { name: fnName, result: `[DUPLICATE] 你已调用过 "${fnName}" 且参数完全一致，结果不会改变。请基于已有信息回复用户。` }
+              }
+              calledTools.add(callKey)
+            }
+            return await tools().execute(fnName, args, ctx)
+          } catch (err) {
+            return { name: tc?.function?.name || "unknown", error: err?.message || String(err) }
+          }
+        }))
         for (let i = 0; i < results.length; i++) {
           const r = results[i]
           const callId = res.tool_calls[i]?.id || `call_${i}`
@@ -488,19 +506,27 @@ export class AigcFallback extends plugin {
       return
     }
 
-    // 轮次超限，最后一次不带 tools 尝试
-    log.warn(`超限`)
-    const fallbackMessages = [...baseMessages, ...pending]
     if (!userPushed) {
-      const um = { role: "user", content: userMsg }
-      if (images) um.images = images
-      fallbackMessages.push(um)
+      pending.push({ role: "user", content: userMsg, time: Date.now(), ...(images ? { images } : {}) })
+      userPushed = true
     }
-    const finalReply = await Bot.aigc.provider.chat(fallbackMessages)
+    const stopHint = `\n\n[系统提示] 你已达到最大工具调用轮次 (${MAX_TOOL_ROUNDS}轮)。请立即基于已获取的所有信息回复用户，不要再调用任何工具。如果信息不足，如实说明已掌握的情况即可。`
+    const finalMessages = [...baseMessages, ...pending]
+    const lastRole = finalMessages[finalMessages.length - 1]?.role
+    if (lastRole === "user") {
+      const last = finalMessages[finalMessages.length - 1]
+      finalMessages[finalMessages.length - 1] = { ...last, content: (last.content || "") + stopHint }
+    } else {
+      finalMessages.push({ role: "user", content: stopHint })
+    }
+    const finalOpts = {}
+    const finalToolDefs = tools().getDefinitions()
+    if (finalToolDefs.length) {
+      finalOpts.tools = finalToolDefs
+      finalOpts.tool_choice = "auto"
+    }
+    const finalReply = await Bot.aigc.provider.chat(finalMessages, finalOpts)
     if (finalReply.content) {
-      if (!userPushed) {
-        pending.push({ role: "user", content: userMsg, time: Date.now(), ...(images ? { images } : {}) })
-      }
       pending.push(this._buildAssistantMsg(finalReply))
       await con().appendMessages(sessionKey, pending)
       log.warn(`工具轮次超限，降级回复成功`)
@@ -508,6 +534,6 @@ export class AigcFallback extends plugin {
     }
 
     log.error(`全部失败`)
-    return this.reply("工具调用轮次超限，请简化你的请求后重试", true)
+    return this.reply("处理超时，请简化你的请求后重试", true)
   }
 }
