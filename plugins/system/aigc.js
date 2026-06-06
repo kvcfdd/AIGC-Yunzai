@@ -266,12 +266,7 @@ export class AigcFallback extends plugin {
     }
   }
 
-  /** 构建 system prompt，MD 格式：
-   *   ## 角色设定 → 名字 + 结构化字段 (仅已配置项)
-   *   ## 行为准则 → 时间 + 工具规则 + 分句 + 补充
-   *   ## 用户记忆 → 长期记忆
-   *   ## 知识库参考 → 知识库检索
-   *   ## 聊天环境 → 群聊/私聊上下文 */
+  /** 构建 system prompt，MD 标题 + XML 标签格式 */
   async _buildSystem(userMsg) {
     const parts = []
 
@@ -293,66 +288,32 @@ export class AigcFallback extends plugin {
     return parts.join("\n")
   }
 
-  /** ## 角色设定 */
+  /** System Prompt */
   _buildIdentity() {
-    const lines = []
-    const name = cfg.aigc?.system_prompt?.bot_name || "AIGC Bot"
-    lines.push(`- **名字**: ${name}`)
-
-    const fields = [
-      ["性别", "bot_gender"],
-      ["年龄", "bot_age"],
-      ["性格特点", "bot_personality"],
-      ["外貌特征", "bot_appearance"],
-      ["爱好", "bot_likes"],
-      ["讨厌", "bot_dislikes"],
-      ["说话语气", "bot_tone"],
-      ["背景信息", "bot_background"],
-    ]
-
-    for (const [label, key] of fields) {
-      const val = cfg.aigc?.system_prompt?.[key]
-      if (val) lines.push(`- **${label}**: ${val}`)
-    }
-
-    const custom = cfg.aigc?.system_prompt?.custom
-    if (custom && typeof custom === "object") {
-      for (const [k, v] of Object.entries(custom)) {
-        if (typeof k === "string" && k.trim() && typeof v === "string" && v.trim()) {
-          lines.push(`- **${k.trim()}**: ${v.trim()}`)
-        } else {
-          log.warn(`提示词自定义属性格式有误，已跳过: ${k}: ${JSON.stringify(v)}`)
-        }
-      }
-    }
-
-    return `## 角色设定\n${lines.join("\n")}`
+    const prompt = cfg.aigc?.system_prompt || "你的名字叫云崽，一个智能助手。根据用户的提问提供有帮助的回答。"
+    return `## System Prompt\n${prompt}`
   }
 
-  /** 其它 */
+  /** 系统补充信息 */
   _buildSupplement() {
+    const e = this.e
     const lines = []
 
     const timeStr = formatDate(new Date(), "full")
-    lines.push(`- 当前时间: ${timeStr}`)
-    lines.push(`- 你可以调用工具，最多连续 ${MAX_TOOL_ROUNDS} 轮，禁止超过限制的工具调用行为！`)
+    lines.push(`- 现在是${timeStr}，回复内容请注意时效性。`)
+    lines.push(`- 你可以最多连续调用${MAX_TOOL_ROUNDS}轮工具，严禁超过限制的工具调用行为！`)
 
     if (cfg.aigc?.split_reply) {
-      lines.push("- 如需发送多条消息，用 `<x><x><x>` 分割，系统会自动拆分为多条消息发送")
+      lines.push("- 如需一次回复多条消息，回复内容用标签 `<x><x><x>` 分离，系统会自动拆分为多条消息发送。")
+    }
+    if (e.isGroup) {
+      lines.push("- 群聊最近消息仅作为上下文提供给你，帮助你更好地理解当前对话环境，但你的回答不应受其影响。")
     }
 
-    const supplement = cfg.aigc?.system_prompt?.supplement
-    if (supplement) {
-      const items = Array.isArray(supplement) ? supplement : [supplement]
-      for (const item of items) {
-        if (item) lines.push(`- ${item}`)
-      }
-    }
-
-    return `## 其它补充\n${lines.join("\n")}`
+    return `<system_supplement>\n${lines.join("\n")}\n</system_supplement>`
   }
 
-  /** 构建聊天环境上下文 */
+  /** 群聊/私聊信息 */
   async _buildEnvContext() {
     const e = this.e
 
@@ -368,21 +329,21 @@ export class AigcFallback extends plugin {
       const lines = []
       lines.push(`- 类型: 群聊`)
       lines.push(`- 群名: ${e.group_name || "Unknown"} (ID: ${e.group_id})`)
-      lines.push(`- 你的群名片: ${botName}`)
+      lines.push(`- 你的群昵称: ${botName}`)
       lines.push(`- 你的QQ: ${e.self_id}`)
       lines.push(`- 当前说话人: [${card}](QQ: ${e.user_id}, 性别: ${sex}, 群身份: ${role})`)
 
       const histCount = cfg.aigc?.group_history_count ?? 30
       if (histCount > 0) {
         const history = await this._getGroupHistory(histCount)
-        if (history) lines.push(`- 群聊最近消息:\n${history}`)
+        if (history) lines.push(`  <group_history>\n${history}\n  </group_history>`)
       }
 
-      return `## 聊天环境\n${lines.join("\n")}`
+      return `<chat_context>\n${lines.join("\n")}\n</chat_context>`
     }
 
     const name = e.sender?.nickname || "Unknown"
-    return `## 聊天环境\n- 类型: 私聊\n- 用户: [${name}](QQ: ${e.user_id})`
+    return `<chat_context>\n- 类型: 私聊\n- 用户: [${name}](QQ: ${e.user_id})\n</chat_context>`
   }
 
   /** 获取群聊最近 N 条消息 */

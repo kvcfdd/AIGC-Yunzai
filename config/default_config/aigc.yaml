@@ -23,34 +23,10 @@ gemini:
 max_tokens: 2048
 # 输出随机程度 (0-1，值越大输出越随机)
 temperature: 1
-# 角色设定
-system_prompt:
-  # 机器人名称
-  bot_name: AIGC Bot
-  # 性别
-  bot_gender: ""
-  # 年龄
-  bot_age: ""
-  # 性格
-  bot_personality: ""
-  # 外貌
-  bot_appearance: ""
-  # 喜好
-  bot_likes: ""
-  # 讨厌
-  bot_dislikes: ""
-  # 说话语气 / 风格
-  bot_tone: ""
-  # 背景故事
-  bot_background: ""
-  # 自定义角色属性 (key: value，仅字符串值生效)
-  custom: {}
-  #  职业: 学生
-  #  口头禅: 喵了个咪的
-  # 补充要求
-  supplement:
-  #  - 禁止使用英文回复
-  #  - 使用 markdown 格式输出
+# 机器人名称(AIGC相关日志显示)
+bot_name: AIGC
+# 系统提示词
+system_prompt: ""
 
 # MCP 工具服务器 (支持 Streamable HTTP 和 stdio)
 mcp:
