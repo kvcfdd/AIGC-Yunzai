@@ -302,12 +302,12 @@ export class AigcFallback extends plugin {
     const fields = [
       ["性别", "bot_gender"],
       ["年龄", "bot_age"],
-      ["性格", "bot_personality"],
-      ["外貌", "bot_appearance"],
-      ["喜好", "bot_likes"],
+      ["性格特点", "bot_personality"],
+      ["外貌特征", "bot_appearance"],
+      ["爱好", "bot_likes"],
       ["讨厌", "bot_dislikes"],
-      ["语气", "bot_tone"],
-      ["背景", "bot_background"],
+      ["说话语气", "bot_tone"],
+      ["背景信息", "bot_background"],
     ]
 
     for (const [label, key] of fields) {
@@ -338,7 +338,7 @@ export class AigcFallback extends plugin {
     lines.push(`- 你可以调用工具，最多连续 ${MAX_TOOL_ROUNDS} 轮，禁止超过限制的工具调用行为！`)
 
     if (cfg.aigc?.split_reply) {
-      lines.push("- 如需发送多条消息，用 `<x><x><x>` 分割，系统会自动拆分为多条依次发送")
+      lines.push("- 如需发送多条消息，用 `<x><x><x>` 分割，系统会自动拆分为多条消息发送")
     }
 
     const supplement = cfg.aigc?.system_prompt?.supplement
