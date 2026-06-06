@@ -266,16 +266,20 @@ export class AigcFallback extends plugin {
     }
   }
 
-  /** 构建 system prompt：基础提示词 + 时间 + 工具规则 + 记忆 + 知识库 + 环境上下文 */
+  /** 构建 system prompt，MD 格式：
+   *   ## 角色设定 → 名字 + 结构化字段 (仅已配置项)
+   *   ## 行为准则 → 时间 + 工具规则 + 分句 + 补充
+   *   ## 用户记忆 → 长期记忆
+   *   ## 知识库参考 → 知识库检索
+   *   ## 聊天环境 → 群聊/私聊上下文 */
   async _buildSystem(userMsg) {
-    const systemPrompt = `你的名字叫${cfg.aigc?.bot_name || "AIGC Bot"}，${cfg.aigc?.system_prompt || "You are an intelligent chatbot assistant."}`
-      + (cfg.aigc?.split_reply ? `如果你想要一次回复多条消息，请使用 <x><x><x> 分割文本，例如：第一条消息内容<x><x><x>第二条消息内容<x><x><x>第三条消息内容，系统会帮你分为3条消息依次发送。` : "")
+    const parts = []
 
-    const timeStr = formatDate(new Date(), "full")
-    const toolRules = "You may call tools for up to 4 consecutive rounds. After that, stop calling tools and reply to the user based on the information you already have, even if incomplete."
-    const parts = [
-      `${systemPrompt}Current time: ${timeStr}. Take timeliness into account when answering.${toolRules}`,
-    ]
+    const identity = this._buildIdentity()
+    if (identity) parts.push(identity)
+
+    const supplement = this._buildSupplement()
+    if (supplement) parts.push(supplement)
 
     const memCtx = await Bot.aigc.memory.toContext(this.e.user_id)
     if (memCtx) parts.push(memCtx)
@@ -289,7 +293,66 @@ export class AigcFallback extends plugin {
     return parts.join("\n")
   }
 
-  /** 构建聊天环境上下文：私聊/群聊信息、群内最近消息 */
+  /** ## 角色设定 */
+  _buildIdentity() {
+    const lines = []
+    const name = cfg.aigc?.system_prompt?.bot_name || "AIGC Bot"
+    lines.push(`- **名字**: ${name}`)
+
+    const fields = [
+      ["性别", "bot_gender"],
+      ["年龄", "bot_age"],
+      ["性格", "bot_personality"],
+      ["外貌", "bot_appearance"],
+      ["喜好", "bot_likes"],
+      ["讨厌", "bot_dislikes"],
+      ["语气", "bot_tone"],
+      ["背景", "bot_background"],
+    ]
+
+    for (const [label, key] of fields) {
+      const val = cfg.aigc?.system_prompt?.[key]
+      if (val) lines.push(`- **${label}**: ${val}`)
+    }
+
+    const custom = cfg.aigc?.system_prompt?.custom
+    if (custom && typeof custom === "object") {
+      for (const [k, v] of Object.entries(custom)) {
+        if (typeof k === "string" && k.trim() && typeof v === "string" && v.trim()) {
+          lines.push(`- **${k.trim()}**: ${v.trim()}`)
+        } else {
+          log.warn(`提示词自定义属性格式有误，已跳过: ${k}: ${JSON.stringify(v)}`)
+        }
+      }
+    }
+
+    return `## 角色设定\n${lines.join("\n")}`
+  }
+
+  /** 其它 */
+  _buildSupplement() {
+    const lines = []
+
+    const timeStr = formatDate(new Date(), "full")
+    lines.push(`- 当前时间: ${timeStr}`)
+    lines.push(`- 你可以调用工具，最多连续 ${MAX_TOOL_ROUNDS} 轮，禁止超过限制的工具调用行为！`)
+
+    if (cfg.aigc?.split_reply) {
+      lines.push("- 如需发送多条消息，用 `<x><x><x>` 分割，系统会自动拆分为多条依次发送")
+    }
+
+    const supplement = cfg.aigc?.system_prompt?.supplement
+    if (supplement) {
+      const items = Array.isArray(supplement) ? supplement : [supplement]
+      for (const item of items) {
+        if (item) lines.push(`- ${item}`)
+      }
+    }
+
+    return `## 其它补充\n${lines.join("\n")}`
+  }
+
+  /** 构建聊天环境上下文 */
   async _buildEnvContext() {
     const e = this.e
 
@@ -302,20 +365,24 @@ export class AigcFallback extends plugin {
       const role = { owner: "群主", admin: "群管理员", member: "群成员" }[e.member?.role] || e.member?.role || "群成员"
       const sex = { male: "男", female: "女", unknown: "未知" }[e.member?.sex] || e.member?.sex || "未知"
 
-      const avatar = `https://q.qlogo.cn/g?b=qq&s=0&nk=${e.user_id}`
-      let ctx = `You are in a group chat. Group: "${e.group_name || "Unknown"}" (ID: ${e.group_id}). Your nickname in this group: ${botName}. Your QQ: ${e.self_id}. Current speaker: [${card}](qq:${e.user_id},sex:${sex},role:${role},avatar:${avatar}).`
+      const lines = []
+      lines.push(`- 类型: 群聊`)
+      lines.push(`- 群名: ${e.group_name || "Unknown"} (ID: ${e.group_id})`)
+      lines.push(`- 你的群名片: ${botName}`)
+      lines.push(`- 你的QQ: ${e.self_id}`)
+      lines.push(`- 当前说话人: [${card}](QQ: ${e.user_id}, 性别: ${sex}, 群身份: ${role})`)
 
       const histCount = cfg.aigc?.group_history_count ?? 30
       if (histCount > 0) {
         const history = await this._getGroupHistory(histCount)
-        if (history) ctx += `\nRecent group chat history:\n${history}`
+        if (history) lines.push(`- 群聊最近消息:\n${history}`)
       }
 
-      return ctx
+      return `## 聊天环境\n${lines.join("\n")}`
     }
 
-    const avatar = `https://q.qlogo.cn/g?b=qq&s=0&nk=${e.user_id}`
-    return `You are in a private chat. User: ${e.sender?.nickname || "Unknown"} (QQ: ${e.user_id}, avatar: ${avatar}).`
+    const name = e.sender?.nickname || "Unknown"
+    return `## 聊天环境\n- 类型: 私聊\n- 用户: [${name}](QQ: ${e.user_id})`
   }
 
   /** 获取群聊最近 N 条消息 */
@@ -340,15 +407,16 @@ export class AigcFallback extends plugin {
         let time = ""
         if (msg.time) {
           const d = new Date(msg.time * 1000)
-          time = `${d.getMonth() + 1}-${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+          const pad = n => String(n).padStart(2, "0")
+          time = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
         }
 
         const text = this._extractMsgText(msg)
         if (!text) continue
 
-        const meta = [`qq:${qq}`, `sex:${sex}`, `role:${role}`]
-        if (time) meta.push(`time:${time}`)
-        lines.push(`[${name}](${meta.join(",")}): ${text}`)
+        const meta = [`QQ: ${qq}`, `性别: ${sex}`, `群身份: ${role}`]
+        if (time) meta.push(`时间: ${time}`)
+        lines.push(`  - [${name}](${meta.join(", ")}): ${text}`)
       }
 
       return lines.length ? lines.join("\n") : null
@@ -477,11 +545,15 @@ export class AigcFallback extends plugin {
             return { name: tc?.function?.name || "unknown", error: err?.message || String(err) }
           }
         }))
+        const lastRound = round === MAX_TOOL_ROUNDS - 1
         for (let i = 0; i < results.length; i++) {
           const r = results[i]
           const callId = res.tool_calls[i]?.id || `call_${i}`
           const payload = "error" in r ? r.error : r.result
-          const content = typeof payload === "string" ? payload : JSON.stringify(payload ?? "")
+          let content = typeof payload === "string" ? payload : JSON.stringify(payload ?? "")
+          if (lastRound && i === results.length - 1) {
+            content += `\n\n[系统提示] 你已达到最大工具调用轮次 (${MAX_TOOL_ROUNDS}轮)。请立即基于已获取的所有信息回复用户，不要再调用任何工具！！！如果信息不足，如实说明已掌握的情况即可。`
+          }
           pending.push({ role: "tool", content, tool_call_id: callId })
         }
         continue
@@ -510,12 +582,13 @@ export class AigcFallback extends plugin {
       return
     }
 
-    // 第 0 轮 tool_calls 已设 userPushed=true，pending 末尾恒为 tool → 直接追加 hint
-    const finalMessages = [
-      ...baseMessages,
-      ...pending,
-      { role: "user", content: `\n\n[系统提示] 你已达到最大工具调用轮次 (${MAX_TOOL_ROUNDS}轮)。请立即基于已获取的所有信息回复用户，不要再调用任何工具。如果信息不足，如实说明已掌握的情况即可。` },
-    ]
+    // 工具轮次用尽：最后一轮工具结果已附带停止提示
+    // 再发一次带 tools 的请求 —— 听话则正常结束，头铁则拦截
+    if (!userPushed) {
+      pending.push({ role: "user", content: userMsg, time: Date.now(), ...(images ? { images } : {}) })
+      userPushed = true
+    }
+    const finalMessages = [...baseMessages, ...pending]
     const finalOpts = {}
     const finalToolDefs = tools().getDefinitions()
     if (finalToolDefs.length) {
@@ -523,33 +596,21 @@ export class AigcFallback extends plugin {
       finalOpts.tool_choice = "auto"
     }
     const finalReply = await Bot.aigc.provider.chat(finalMessages, finalOpts)
-    if (finalReply.content) {
+
+    // 听话，纯文本回复，正常保存并发送
+    if (finalReply.content && !finalReply.tool_calls?.length) {
       pending.push(this._buildAssistantMsg(finalReply))
       await con().appendMessages(sessionKey, pending)
       log.warn(`工具轮次超限，降级回复成功`)
       return this._sendReply(finalReply.content)
     }
-    // LLM 忽略提示仍调工具：执行后强制不再带 tools 请求一次
-    if (finalReply.tool_calls?.length) {
-      const results = await tools().executeAll(finalReply.tool_calls, { user_id: this.e.user_id, event: this.e })
-      pending.push(this._buildAssistantMsg(finalReply))
-      for (let i = 0; i < results.length; i++) {
-        const r = results[i]
-        const callId = finalReply.tool_calls[i]?.id || `call_${i}`
-        const payload = "error" in r ? r.error : r.result
-        const content = typeof payload === "string" ? payload : JSON.stringify(payload ?? "")
-        pending.push({ role: "tool", content, tool_call_id: callId })
-      }
-      // 用包含工具结果的 pending 重新请求，不带 tools 强制文本回复
-      const forcedReply = await Bot.aigc.provider.chat([...baseMessages, ...pending], {})
-      if (forcedReply.content) {
-        pending.push(this._buildAssistantMsg(forcedReply))
-        await con().appendMessages(sessionKey, pending)
-        return this._sendReply(forcedReply.content)
-      }
-    }
 
+    // 头铁硬要调工具：直接拦截，本轮对话不缓存
+    if (finalReply.tool_calls?.length) {
+      const names = finalReply.tool_calls.map(c => c.function?.name).filter(Boolean).join(",")
+      log.warn(`工具轮次超限，LLM仍试图调用工具: ${names}`)
+    }
     log.error(`全部失败`)
-    return this.reply("处理超时，请简化你的请求后重试", true)
+    return this.reply("请求失败，请稍后再试", true)
   }
 }

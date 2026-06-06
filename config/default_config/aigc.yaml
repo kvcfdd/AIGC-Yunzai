@@ -16,16 +16,41 @@ gemini:
   endpoint: https://generativelanguage.googleapis.com # 可替换为兼容 Google Gemini API 的反代地址
   api_key: "" # 多 Key 用英文逗号分隔，如 "xxx,yyy"
   model: gemini-3.5-flash,gemini-3-flash-preview # 模型，多模型用英文逗号分隔 (不建议3系以前的模型)
-  thinking_level: minimal # 思考等级 minimal, low, medium, high
+  thinking_level: low # 思考等级 minimal, low, medium, high
+  embedding_model: gemini-embedding-2 # Embedding 模型，用于知识库向量化
 
 # 输出最大长度
 max_tokens: 2048
 # 输出随机程度 (0-1，值越大输出越随机)
-temperature: 0.9
-# 机器人名称(会拼接至提示词开头和日志中)
-bot_name: AIGC Bot
-# 系统提示词 (你的名字叫 bot_name，system_prompt)
-system_prompt: You are an intelligent chatbot assistant.
+temperature: 1
+# 角色设定
+system_prompt:
+  # 机器人名称
+  bot_name: AIGC Bot
+  # 性别
+  bot_gender: ""
+  # 年龄
+  bot_age: ""
+  # 性格
+  bot_personality: ""
+  # 外貌
+  bot_appearance: ""
+  # 喜好
+  bot_likes: ""
+  # 讨厌
+  bot_dislikes: ""
+  # 说话语气 / 风格
+  bot_tone: ""
+  # 背景故事
+  bot_background: ""
+  # 自定义角色属性 (key: value，仅字符串值生效)
+  custom: {}
+  #  职业: 学生
+  #  口头禅: 喵了个咪的
+  # 补充要求
+  supplement:
+  #  - 禁止使用英文回复
+  #  - 使用 markdown 格式输出
 
 # MCP 工具服务器 (支持 Streamable HTTP 和 stdio)
 mcp:
