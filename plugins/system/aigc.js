@@ -73,9 +73,9 @@ export class AigcFallback extends plugin {
     return parts
   }
 
-  /** 按 <x><x><x> 分隔符拆分为多条消息依次发送 */
+  /** 按 <x> 分隔符拆分为多条消息依次发送 */
   async _splitReply(text) {
-    const parts = text.split(/<x><x><x>/)
+    const parts = text.split(/<x>/)
     if (parts.length <= 1) return this.reply(text, true)
     for (let i = 0; i < parts.length; i++) {
       const t = parts[i].trim()
@@ -301,13 +301,13 @@ export class AigcFallback extends plugin {
 
     const timeStr = formatDate(new Date(), "full")
     lines.push(`- 现在是${timeStr}，回复内容请注意时效性。`)
-    lines.push(`- 你可以最多连续调用${MAX_TOOL_ROUNDS}轮工具，严禁超过限制的工具调用行为！`)
+    lines.push(`- 你可以最多连续调用${MAX_TOOL_ROUNDS}轮工具,严禁超过限制的工具调用行为！`)
 
     if (cfg.aigc?.split_reply) {
-      lines.push("- 如需一次回复多条消息，回复内容用标签 `<x><x><x>` 分离，系统会自动拆分为多条消息发送。")
+      lines.push("- 一句话讲不完就<x>拆成多条发,模仿人类打一句话发一句话的习惯,最多允许一次拆3条。例如: 好的呀<x>那就给你瞧瞧我的本事吧！")
     }
     if (e.isGroup) {
-      lines.push("- 群聊最近消息仅作为上下文提供给你，帮助你更好地理解当前对话环境，但你的回答不应受其影响。")
+      lines.push("- 群聊最近消息仅作为上下文提供给你,帮助你更好地理解当前对话环境,但你的回答不应受其影响。")
     }
 
     return `<system_supplement>\n${lines.join("\n")}\n</system_supplement>`
