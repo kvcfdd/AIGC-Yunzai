@@ -253,7 +253,7 @@ export class AigcFallback extends plugin {
 
     await con().setSystem(key, await this._buildSystem(userMsg))
 
-    const images = this.e.img?.length ? this.e.img : null
+    const images = await Bot.aigc.provider.resolveImages(this.e.img)
 
     try {
       await this._replyLoop(key, userMsg, images)
