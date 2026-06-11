@@ -24,11 +24,7 @@ export class AigcFallback extends plugin {
         { reg: /^#结束对话$/i, fnc: "clearConv" },
         { reg: /^#清除记忆$/i, fnc: "clearConvAndMem" },
         { reg: /^#结束全部对话$/i, fnc: "clearAllConv", permission: "master" },
-        {
-          reg: /^#清除全部记忆$/i,
-          fnc: "clearAllConvAndMem",
-          permission: "master",
-        },
+        { reg: /^#清除全部记忆$/i, fnc: "clearAllConvAndMem", permission: "master", },
         { reg: /^#知识库添加(.+)$/i, fnc: "kbAdd" },
         { reg: /^#知识库删除\s*(\S+)$/i, fnc: "kbRemove" },
         { reg: /^#知识库列表$/i, fnc: "kbList" },
@@ -67,7 +63,7 @@ export class AigcFallback extends plugin {
                   }
                 }
             }
-          } catch {}
+          } catch { }
           qq ? parts.push(segment.at(qq)) : parts.push({ type: "text", data: { text: m[0] } })
         }
       } else if (m[3]) {
@@ -193,7 +189,7 @@ export class AigcFallback extends plugin {
         const m = Bot.pickMember(this.e.group_id, qq)
         return m.card || m.nickname || String(qq)
       }
-    } catch {}
+    } catch { }
     return String(qq)
   }
 
@@ -332,7 +328,7 @@ export class AigcFallback extends plugin {
       let botCard = ""
       try {
         botCard = e.group?.pickMember?.(e.self_id)?.card || ""
-      } catch {}
+      } catch { }
       const botName = botCard || Bot[e.self_id]?.nickname || ""
 
       const card = e.sender?.card || e.sender?.nickname || ""
