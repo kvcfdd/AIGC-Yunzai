@@ -150,7 +150,7 @@ export class maintTask extends plugin {
     } catch (err) {
       return { ok: false, msg: `YAML解析失败: ${err.message}` }
     } finally {
-      await fs.unlink(tmpFile).catch(() => { })
+      await fs.unlink(tmpFile).catch(() => {})
     }
 
     const regex = new RegExp(mihomo.exclude_regex || "$^", "i")

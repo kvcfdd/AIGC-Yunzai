@@ -8,25 +8,27 @@ export default class ServerRenderer extends Renderer {
     super({
       id: "server",
       type: "image",
-      render: "noop"
+      render: "noop",
     })
     this.config = config
     this.app = express()
-    
+
     // 并发控制配置
     this.queue = []
     this.activeCount = 0
     this.maxConcurrency = config.maxConcurrency || 2 // 最大并发数
-    
+
     this.init()
   }
 
   // 占位符
-  noop() { return false }
+  noop() {
+    return false
+  }
 
   async init() {
     this.app.use(express.json({ limit: "50mb" }))
-    this.app.use(express.urlencoded({ limit: '50mb', extended: true }))
+    this.app.use(express.urlencoded({ limit: "50mb", extended: true }))
 
     // 渲染接口
     this.app.post("/render", async (req, res) => {
@@ -40,17 +42,17 @@ export default class ServerRenderer extends Renderer {
           if (!html && !url) throw new Error("Missing html or url")
 
           // 确定图片格式
-          const imgType = type === 'png' ? 'png' : 'jpeg'
-          
+          const imgType = type === "png" ? "png" : "jpeg"
+
           // 开始任务
           browser.startTask()
 
           // 获取浏览器实例
           const chromium = await browser.getBrowser(this.config)
-          
+
           // 创建上下文
           context = await chromium.newContext({
-            viewport: viewport || { width: 800, height: 600 }
+            viewport: viewport || { width: 800, height: 600 },
           })
 
           const page = await context.newPage()
@@ -69,9 +71,9 @@ export default class ServerRenderer extends Renderer {
           // 寻找目标元素
           const targetSelector = selector || ".container"
           let target = page.locator(targetSelector).first()
-          
+
           try {
-            await target.waitFor({ state: 'visible', timeout: 2000 })
+            await target.waitFor({ state: "visible", timeout: 2000 })
           } catch (e) {
             target = page.locator("body")
           }
@@ -79,18 +81,18 @@ export default class ServerRenderer extends Renderer {
           // 智能调整视口
           const size = await target.boundingBox()
           if (size) {
-             await page.setViewportSize({
-                width: Math.max(Math.ceil(size.width), viewport?.width || 800),
-                height: Math.max(Math.ceil(size.height), 100)
-             })
+            await page.setViewportSize({
+              width: Math.max(Math.ceil(size.width), viewport?.width || 800),
+              height: Math.max(Math.ceil(size.height), 100),
+            })
           }
 
           // 构建截图选项
           const screenshotOptions = {
             type: imgType,
-            quality: imgType === 'png' ? undefined : (quality || 90),
+            quality: imgType === "png" ? undefined : quality || 90,
             omitBackground: omitBackground || false,
-            animations: "disabled"
+            animations: "disabled",
           }
 
           // 截图
@@ -99,9 +101,10 @@ export default class ServerRenderer extends Renderer {
           // 返回对应的 Content-Type
           res.set("Content-Type", `image/${imgType}`)
           res.send(buff)
-          
-          logger.mark(`[ServerRenderer][${browser.taskNum + 1}次][${reqId}] 渲染成功 [${imgType.toUpperCase()}] ${Math.round(buff.length / 1024)}KB`)
 
+          logger.mark(
+            `[ServerRenderer][${browser.taskNum + 1}次][${reqId}] 渲染成功 [${imgType.toUpperCase()}] ${Math.round(buff.length / 1024)}KB`,
+          )
         } catch (err) {
           logger.error(`[ServerRenderer][${reqId}] 失败`, err.message)
           res.status(500).json({ error: err.message })
@@ -114,16 +117,18 @@ export default class ServerRenderer extends Renderer {
     })
 
     const port = this.config.port || 1134
-    this.app.listen(port, () => {
-      logger.info(`[ServerRenderer] 服务启动: http://localhost:${port}`)
-    }).on('error', (err) => {
-      logger.error(`[ServerRenderer] 端口 ${port} 启动失败:`, err.message)
-    })
+    this.app
+      .listen(port, () => {
+        logger.info(`[ServerRenderer] 服务启动: http://localhost:${port}`)
+      })
+      .on("error", err => {
+        logger.error(`[ServerRenderer] 端口 ${port} 启动失败:`, err.message)
+      })
   }
 
   /**
    * 并发队列处理器
-   * @param {Function} task 
+   * @param {Function} task
    */
   async runInQueue(task) {
     if (this.activeCount < this.maxConcurrency) {
@@ -135,7 +140,7 @@ export default class ServerRenderer extends Renderer {
         this.next()
       }
     } else {
-      return new Promise((resolve) => {
+      return new Promise(resolve => {
         this.queue.push(async () => {
           this.activeCount++
           try {

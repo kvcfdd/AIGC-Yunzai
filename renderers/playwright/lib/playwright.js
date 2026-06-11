@@ -11,12 +11,12 @@ export default class Playwright extends Renderer {
     super({
       id: "playwright",
       type: "image",
-      render: "screenshot"
+      render: "screenshot",
     })
 
     this.config = config
-    this.activeTaskCount = 0  // 活跃任务数
-    this.scale = config.scale || 1.5  // 缩放比例
+    this.activeTaskCount = 0 // 活跃任务数
+    this.scale = config.scale || 1.5 // 缩放比例
 
     // 并发控制
     this.queue = []
@@ -42,7 +42,9 @@ export default class Playwright extends Renderer {
       if (this.activeTaskCount < this.maxConcurrency) {
         task()
       } else {
-        logger.mark(`[Playwright] 正在排队... 当前任务: ${this.activeTaskCount}, 队列: ${this.queue.length + 1}`)
+        logger.mark(
+          `[Playwright] 正在排队... 当前任务: ${this.activeTaskCount}, 队列: ${this.queue.length + 1}`,
+        )
         this.queue.push(task)
       }
     })
@@ -55,7 +57,7 @@ export default class Playwright extends Renderer {
     }
   }
 
-/**
+  /**
    * 核心截图方法
    * @param {string} name 模板名称
    * @param {object} data 模板数据
@@ -75,7 +77,7 @@ export default class Playwright extends Renderer {
       // 创建浏览器上下文
       context = await chromium.newContext({
         deviceScaleFactor: data.deviceScaleFactor || data.viewport?.deviceScaleFactor || this.scale,
-        viewport: { width: data.width || 800, height: 600 } // 初始视口
+        viewport: { width: data.width || 800, height: 600 }, // 初始视口
       })
 
       // 创建页面
@@ -99,7 +101,7 @@ export default class Playwright extends Renderer {
       try {
         await locator.waitFor({ state: "visible", timeout: 2000 })
       } catch {
-       // logger.warn(`[Playwright] 未找到 ${selector}，降级为 body`)
+        // logger.warn(`[Playwright] 未找到 ${selector}，降级为 body`)
       }
       const target = (await locator.count()) > 0 ? locator : page.locator("body")
 
@@ -108,8 +110,8 @@ export default class Playwright extends Renderer {
 
       // 设置视口尺寸
       const viewWidth = Math.max(Math.ceil(box.width), 1)
-      const viewHeight = data.multiPage 
-        ? (data.pageHeight || 5000) + 100 
+      const viewHeight = data.multiPage
+        ? (data.pageHeight || 5000) + 100
         : Math.max(Math.ceil(box.height), 1)
 
       await page.setViewportSize({ width: viewWidth, height: viewHeight })
@@ -119,9 +121,9 @@ export default class Playwright extends Renderer {
       const isPng = data.imgType === "png"
       const screenshotOpts = {
         type: isPng ? "png" : "jpeg",
-        quality: isPng ? undefined : (data.quality || 90),
-        omitBackground: isPng ? (!!data.omitBackground) : false,
-        animations: "disabled"
+        quality: isPng ? undefined : data.quality || 90,
+        omitBackground: isPng ? !!data.omitBackground : false,
+        animations: "disabled",
       }
 
       if (data.multiPage) {
@@ -133,13 +135,13 @@ export default class Playwright extends Renderer {
 
         await page.setViewportSize({
           width: Math.ceil(box.width),
-          height: pageHeight + 100
+          height: pageHeight + 100,
         })
 
         for (let i = 0; i < num; i++) {
           const y = i * pageHeight
           // 滚动页面触发懒加载
-          await page.evaluate((scrollTop) => window.scrollTo(0, scrollTop), y)
+          await page.evaluate(scrollTop => window.scrollTo(0, scrollTop), y)
           // 等待渲染稳定
           await page.waitForTimeout(i === 0 ? 100 : 300)
 
@@ -152,8 +154,8 @@ export default class Playwright extends Renderer {
               x: 0,
               y: y,
               width: box.width,
-              height: currentSliceHeight
-            }
+              height: currentSliceHeight,
+            },
           })
           buff.push(slice)
         }
@@ -167,16 +169,17 @@ export default class Playwright extends Renderer {
         ? `${(buff.reduce((a, b) => a + b.length, 0) / 1024).toFixed(2)}KB (${buff.length}页)`
         : `${(buff.length / 1024).toFixed(2)}KB`
 
-      logger.mark(`[图片生成][${browser.taskNum + 1}次][${name}] ${sizeStr} ${Date.now() - start}ms`)
+      logger.mark(
+        `[图片生成][${browser.taskNum + 1}次][${name}] ${sizeStr} ${Date.now() - start}ms`,
+      )
 
       return buff
-
     } catch (error) {
       logger.error(`[图片生成失败][${name}]`, error)
       return false
     } finally {
       // 资源清理
-      if (context) await context.close().catch(() => { })
+      if (context) await context.close().catch(() => {})
       this.activeTaskCount--
       browser.endTask()
     }

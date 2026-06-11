@@ -24,7 +24,11 @@ export class AigcFallback extends plugin {
         { reg: /^#结束对话$/i, fnc: "clearConv" },
         { reg: /^#清除记忆$/i, fnc: "clearConvAndMem" },
         { reg: /^#结束全部对话$/i, fnc: "clearAllConv", permission: "master" },
-        { reg: /^#清除全部记忆$/i, fnc: "clearAllConvAndMem", permission: "master" },
+        {
+          reg: /^#清除全部记忆$/i,
+          fnc: "clearAllConvAndMem",
+          permission: "master",
+        },
         { reg: /^#知识库添加(.+)$/i, fnc: "kbAdd" },
         { reg: /^#知识库删除\s*(\S+)$/i, fnc: "kbRemove" },
         { reg: /^#知识库列表$/i, fnc: "kbList" },
@@ -55,11 +59,15 @@ export class AigcFallback extends plugin {
           try {
             if (this.e?.isGroup) {
               const ml = Bot.gml?.get(this.e.group_id)
-              if (ml) for (const [id, info] of ml) {
-                if (info.card === target || info.nickname === target) { qq = id; break }
-              }
+              if (ml)
+                for (const [id, info] of ml) {
+                  if (info.card === target || info.nickname === target) {
+                    qq = id
+                    break
+                  }
+                }
             }
-          } catch { }
+          } catch {}
           qq ? parts.push(segment.at(qq)) : parts.push({ type: "text", data: { text: m[0] } })
         }
       } else if (m[3]) {
@@ -165,7 +173,7 @@ export class AigcFallback extends plugin {
     if (!this.e.isMaster) return false
     const docs = await kb().list()
     if (!docs.length) return this.reply("知识库为空", true)
-    const lines = docs.map((d) => `[${d.id}] ${d.content}`)
+    const lines = docs.map(d => `[${d.id}] ${d.content}`)
     return this.reply(lines.join("\n"), true)
   }
 
@@ -185,7 +193,7 @@ export class AigcFallback extends plugin {
         const m = Bot.pickMember(this.e.group_id, qq)
         return m.card || m.nickname || String(qq)
       }
-    } catch { }
+    } catch {}
     return String(qq)
   }
 
@@ -251,11 +259,9 @@ export class AigcFallback extends plugin {
 
     log.info(`用户 ${this.e.user_id} 发起对话`)
 
-    await con().setSystem(key, await this._buildSystem(userMsg))
-
-    const images = await Bot.aigc.provider.resolveImages(this.e.img)
-
     try {
+      await con().setSystem(key, await this._buildSystem(userMsg))
+      const images = await Bot.aigc.provider.resolveImages(this.e.img)
       await this._replyLoop(key, userMsg, images)
     } catch (err) {
       log.error(`对话异常: ${err.message}`)
@@ -290,7 +296,8 @@ export class AigcFallback extends plugin {
 
   /** System Prompt */
   _buildIdentity() {
-    const prompt = cfg.aigc?.system_prompt || "你的名字叫云崽，一个智能助手。根据用户的提问提供有帮助的回答。"
+    const prompt =
+      cfg.aigc?.system_prompt || "你的名字叫云崽，一个智能助手。根据用户的提问提供有帮助的回答。"
     return `## System Prompt\n${prompt}`
   }
 
@@ -304,10 +311,14 @@ export class AigcFallback extends plugin {
     lines.push(`- 你可以最多连续调用${MAX_TOOL_ROUNDS}轮工具,严禁超过限制的工具调用行为！`)
 
     if (cfg.aigc?.split_reply) {
-      lines.push("- 一句话讲不完就<x>拆成多条发,模仿人类打一句话发一句话的习惯,最多允许一次拆3条。注意不要为了拆而拆,而是按实际情况来决定要不要拆！例如: 好的呀<x>那就给你瞧瞧我的本事吧！")
+      lines.push(
+        "- 一句话讲不完就<x>拆成多条发,模仿人类打一句话发一句话的习惯,最多允许一次拆3条。注意不要为了拆而拆,而是按实际情况来决定要不要拆！例如: 好的呀<x>那就给你瞧瞧我的本事吧！",
+      )
     }
     if (e.isGroup) {
-      lines.push("- 群聊最近消息仅作为上下文提供给你,帮助你更好地理解当前对话环境,但你的回答不应受其影响。")
+      lines.push(
+        "- 群聊最近消息仅作为上下文提供给你,帮助你更好地理解当前对话环境,但你的回答不应受其影响。",
+      )
     }
 
     return `<system_supplement>\n${lines.join("\n")}\n</system_supplement>`
@@ -319,19 +330,32 @@ export class AigcFallback extends plugin {
 
     if (e.isGroup) {
       let botCard = ""
-      try { botCard = e.group?.pickMember?.(e.self_id)?.card || "" } catch { }
+      try {
+        botCard = e.group?.pickMember?.(e.self_id)?.card || ""
+      } catch {}
       const botName = botCard || Bot[e.self_id]?.nickname || ""
 
       const card = e.sender?.card || e.sender?.nickname || ""
-      const role = { owner: "群主", admin: "群管理员", member: "群成员" }[e.member?.role] || e.member?.role || "群成员"
-      const sex = { male: "男", female: "女", unknown: "未知" }[e.member?.sex] || e.member?.sex || "未知"
+      const role =
+        { owner: "群主", admin: "群管理员", member: "群成员" }[e.member?.role] ||
+        e.member?.role ||
+        "群成员"
+      const sex =
+        { male: "男", female: "女", unknown: "未知" }[e.member?.sex] || e.member?.sex || "未知"
 
       const lines = []
       lines.push(`- 类型: 群聊`)
       lines.push(`- 群名: ${e.group_name || "Unknown"} (ID: ${e.group_id})`)
       lines.push(`- 你的群昵称: ${botName}`)
       lines.push(`- 你的QQ: ${e.self_id}`)
-      lines.push(`- 当前说话人: [${card}](QQ: ${e.user_id}, 性别: ${sex}, 群身份: ${role})`)
+      lines.push(`- 你的头像: https://q.qlogo.cn/g?b=qq&s=0&nk=${e.self_id}`)
+      const avatar =
+        e.sender?.getAvatarUrl?.() ||
+        e.member?.getAvatarUrl?.() ||
+        `https://q.qlogo.cn/g?b=qq&s=0&nk=${e.user_id}`
+      lines.push(
+        `- 当前说话人: [${card}](QQ: ${e.user_id}, 性别: ${sex}, 群身份: ${role}, 头像: ${avatar})`,
+      )
 
       const histCount = cfg.aigc?.group_history_count ?? 30
       if (histCount > 0) {
@@ -343,7 +367,8 @@ export class AigcFallback extends plugin {
     }
 
     const name = e.sender?.nickname || "Unknown"
-    return `<chat_context>\n- 类型: 私聊\n- 用户: [${name}](QQ: ${e.user_id})\n</chat_context>`
+    const avatar = e.sender?.getAvatarUrl?.() || `https://q.qlogo.cn/g?b=qq&s=0&nk=${e.user_id}`
+    return `<chat_context>\n- 类型: 私聊\n- 你的QQ: ${e.self_id}\n- 你的头像: https://q.qlogo.cn/g?b=qq&s=0&nk=${e.self_id}\n- 用户: [${name}](QQ: ${e.user_id}, 头像: ${avatar})\n</chat_context>`
   }
 
   /** 获取群聊最近 N 条消息 */
@@ -363,8 +388,12 @@ export class AigcFallback extends plugin {
         const sender = msg.sender || {}
         const name = sender.card || sender.nickname || "Unknown"
         const qq = sender.user_id || "?"
-        const sex = { male: "男", female: "女", unknown: "未知" }[sender.sex] || sender.sex || "未知"
-        const role = { owner: "群主", admin: "群管理员", member: "群成员" }[sender.role] || sender.role || "群成员"
+        const sex =
+          { male: "男", female: "女", unknown: "未知" }[sender.sex] || sender.sex || "未知"
+        const role =
+          { owner: "群主", admin: "群管理员", member: "群成员" }[sender.role] ||
+          sender.role ||
+          "群成员"
         let time = ""
         if (msg.time) {
           const d = new Date(msg.time * 1000)
@@ -438,9 +467,21 @@ export class AigcFallback extends plugin {
       role: "assistant",
       content: res.content || null,
       ...(res.tool_calls && { tool_calls: res.tool_calls }),
-      ...(res.reasoning_content && { reasoning_content: res.reasoning_content }),
+      ...(res.reasoning_content && {
+        reasoning_content: res.reasoning_content,
+      }),
       ...(res.reasoning_parts && { reasoning_parts: res.reasoning_parts }),
     }
+  }
+
+  /** 构建 user 消息的公共元数据（时间 + 会话上下文） */
+  _userMsgMeta() {
+    const meta = {
+      time: Date.now(),
+      chat_type: this.e.isGroup ? "群聊" : "私聊",
+    }
+    if (this.e.isGroup) meta.group_name = this.e.group_name || ""
+    return meta
   }
 
   /** 工具调用循环：LLM 回复 → tool_calls 则执行并回传 → 文本则发送并退出。
@@ -476,53 +517,93 @@ export class AigcFallback extends plugin {
       if (res.tool_calls?.length) {
         if (res.content) await this._splitReply(res.content)
 
-        const names = res.tool_calls.map(c => c.function?.name).filter(Boolean).join(",")
+        const names = res.tool_calls
+          .map(c => c.function?.name)
+          .filter(Boolean)
+          .join(",")
         log.info(`调用工具: ${names}`)
 
         if (!userPushed) {
-          pending.push({ role: "user", content: userMsg, time: Date.now(), ...(images ? { images } : {}) })
+          pending.push({
+            role: "user",
+            content: userMsg,
+            ...this._userMsgMeta(),
+            ...(images ? { images } : {}),
+          })
           userPushed = true
         }
         pending.push(this._buildAssistantMsg(res))
 
         const ctx = { user_id: this.e.user_id, event: this.e }
-        const results = await Promise.all(res.tool_calls.map(async tc => {
-          try {
-            const fnName = tc?.function?.name
-            if (!fnName) return { name: "unknown", error: "tool_calls missing function.name" }
-            let args = {}
-            try { args = JSON.parse(tc?.function?.arguments || "{}") } catch { /* pass */ }
-            if (!args || typeof args !== "object") args = {}
-            if (Object.keys(args).length > 0) {
-              const callKey = `${fnName}:${JSON.stringify(args, Object.keys(args).sort())}`
-              if (calledTools.has(callKey)) {
-                log.warn(`重复工具调用已拦截: ${callKey}`)
-                return { name: fnName, result: `[DUPLICATE] 你已调用过 "${fnName}" 且参数完全一致，结果不会改变。请基于已有信息回复用户。` }
+        const results = await Promise.all(
+          res.tool_calls.map(async tc => {
+            try {
+              const fnName = tc?.function?.name
+              if (!fnName)
+                return {
+                  name: "unknown",
+                  error: "tool_calls missing function.name",
+                }
+              let args = {}
+              try {
+                args = JSON.parse(tc?.function?.arguments || "{}")
+              } catch {
+                /* pass */
               }
-              calledTools.add(callKey)
+              if (!args || typeof args !== "object") args = {}
+              if (Object.keys(args).length > 0) {
+                const callKey = `${fnName}:${JSON.stringify(args, Object.keys(args).sort())}`
+                if (calledTools.has(callKey)) {
+                  log.warn(`重复工具调用已拦截: ${callKey}`)
+                  return {
+                    name: fnName,
+                    result: `[DUPLICATE] 你已调用过 "${fnName}" 且参数完全一致，结果不会改变。请基于已有信息回复用户。`,
+                  }
+                }
+                calledTools.add(callKey)
+              }
+              return await tools().execute(fnName, args, ctx)
+            } catch (err) {
+              return {
+                name: tc?.function?.name || "unknown",
+                error: err?.message || String(err),
+              }
             }
-            return await tools().execute(fnName, args, ctx)
-          } catch (err) {
-            return { name: tc?.function?.name || "unknown", error: err?.message || String(err) }
-          }
-        }))
+          }),
+        )
         const lastRound = round === MAX_TOOL_ROUNDS - 1
         for (let i = 0; i < results.length; i++) {
           const r = results[i]
           const callId = res.tool_calls[i]?.id || `call_${i}`
           const payload = "error" in r ? r.error : r.result
-          let content = typeof payload === "string" ? payload : JSON.stringify(payload ?? "")
+          let content, images
+          if (payload && typeof payload === "object" && Array.isArray(payload.images)) {
+            images = payload.images
+            content = payload.text || "图片获取成功"
+          } else {
+            content = typeof payload === "string" ? payload : JSON.stringify(payload ?? "")
+          }
           if (lastRound && i === results.length - 1) {
             content += `\n\n[系统提示] 你已达到最大工具调用轮次 (${MAX_TOOL_ROUNDS}轮)。请立即基于已获取的所有信息回复用户，不要再调用任何工具！！！如果信息不足，如实说明已掌握的情况即可。`
           }
-          pending.push({ role: "tool", content, tool_call_id: callId })
+          pending.push({
+            role: "tool",
+            content,
+            tool_call_id: callId,
+            ...(images?.length ? { images } : {}),
+          })
         }
         continue
       }
 
       if (res.content) {
         if (!userPushed) {
-          pending.push({ role: "user", content: userMsg, time: Date.now(), ...(images ? { images } : {}) })
+          pending.push({
+            role: "user",
+            content: userMsg,
+            ...this._userMsgMeta(),
+            ...(images ? { images } : {}),
+          })
           userPushed = true
         }
         pending.push(this._buildAssistantMsg(res))
@@ -546,7 +627,12 @@ export class AigcFallback extends plugin {
     // 工具轮次用尽：最后一轮工具结果已附带停止提示
     // 再发一次带 tools 的请求 —— 听话则正常结束，头铁则拦截
     if (!userPushed) {
-      pending.push({ role: "user", content: userMsg, time: Date.now(), ...(images ? { images } : {}) })
+      pending.push({
+        role: "user",
+        content: userMsg,
+        ...this._userMsgMeta(),
+        ...(images ? { images } : {}),
+      })
       userPushed = true
     }
     const finalMessages = [...baseMessages, ...pending]
@@ -568,7 +654,10 @@ export class AigcFallback extends plugin {
 
     // 头铁硬要调工具：直接拦截，本轮对话不缓存
     if (finalReply.tool_calls?.length) {
-      const names = finalReply.tool_calls.map(c => c.function?.name).filter(Boolean).join(",")
+      const names = finalReply.tool_calls
+        .map(c => c.function?.name)
+        .filter(Boolean)
+        .join(",")
       log.warn(`工具轮次超限，LLM仍试图调用工具: ${names}`)
     }
     log.error(`全部失败`)

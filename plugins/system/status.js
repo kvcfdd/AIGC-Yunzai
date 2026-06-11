@@ -14,20 +14,6 @@ export class status extends plugin {
           fnc: "status",
         },
       ],
-      tools: [
-        {
-          fnc: "getStatus",
-          description: "获取机器人运行状态：版本、在线时长、内存使用、系统信息",
-        },
-        {
-          fnc: "getStats",
-          description: "查询消息统计数据（收发量、用户数、群数）",
-          params: {
-            scope: { type: "string", desc: "统计范围", enum: ["global", "user", "group"] },
-            target: { type: "number", desc: "用户或群号，scope=user/group 时指定", optional: true },
-          },
-        },
-      ],
     })
   }
 
@@ -49,29 +35,6 @@ export class status extends plugin {
       (await this.count())
 
     return this.reply(Bot.makeForwardArray([msg, this.pluginTime()]))
-  }
-
-  /** LLM 工具: 获取机器人运行状态 */
-  async getStatus() {
-    const msg =
-      `—— AIGC Yunzai v${cfg.package.version} ——\n` +
-      `运行时间：${Bot.getTimeDiff()}\n` +
-      `内存使用：${(process.memoryUsage().rss / 1024 / 1024).toFixed(2)}MB\n` +
-      `系统：${process.platform} ${process.arch} Node ${process.version}\n` +
-      this.botTime()
-    return msg
-  }
-
-  /** LLM 工具: 查询消息统计 */
-  async getStats(args) {
-    const { scope = "global", target } = args || {}
-    const cmd = { msg: [] }
-    if (scope === "user" && target) {
-      cmd["用户"] = String(target)
-    } else if (scope === "group" && target) {
-      cmd["群"] = String(target)
-    }
-    return await this.getCount(cmd)
   }
 
   botTime() {

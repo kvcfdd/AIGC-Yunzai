@@ -28,8 +28,8 @@ Bot.adapter.push(
         .then(data =>
           data.data
             ? new Proxy(data, {
-              get: (target, prop) => target.data[prop] ?? target[prop],
-            })
+                get: (target, prop) => target.data[prop] ?? target[prop],
+              })
             : data,
         )
         .finally(() => {
@@ -978,11 +978,10 @@ Bot.adapter.push(
 
       data.bot
         .sendApi("_set_model_show", { model: data.bot.model, model_show: data.bot.model })
-        .catch(() => { })
+        .catch(() => {})
 
       data.bot.info = (await data.bot.sendApi("get_login_info").catch(i => i.error)).data
-      data.bot.clients =
-        (await data.bot.sendApi("get_online_clients").catch(i => i.error)).clients
+      data.bot.clients = (await data.bot.sendApi("get_online_clients").catch(i => i.error)).clients
       data.bot.version = {
         ...(await data.bot.sendApi("get_version_info").catch(i => i.error)).data,
         id: this.id,
@@ -1135,10 +1134,14 @@ Bot.adapter.push(
             true,
           )
           const group = data.bot.pickGroup(data.group_id)
-          group.getInfo().catch(() => { })
+          group.getInfo().catch(() => {})
           if (data.user_id === data.self_id && cfg.bot.cache_group_member)
-            group.getMemberMap().catch(() => { })
-          else group.pickMember(data.user_id).getInfo().catch(() => { })
+            group.getMemberMap().catch(() => {})
+          else
+            group
+              .pickMember(data.user_id)
+              .getInfo()
+              .catch(() => {})
           break
         }
         case "group_decrease":
@@ -1173,7 +1176,10 @@ Bot.adapter.push(
             true,
           )
           data.set = data.sub_type === "set"
-          data.bot.pickMember(data.group_id, data.user_id).getInfo().catch(() => { })
+          data.bot
+            .pickMember(data.group_id, data.user_id)
+            .getInfo()
+            .catch(() => {})
           break
         case "group_upload": {
           Bot.makeLog(
@@ -1229,7 +1235,10 @@ Bot.adapter.push(
           break
         case "friend_add":
           Bot.makeLog("info", "好友添加", `${data.self_id} <= ${data.user_id}`, true)
-          data.bot.pickFriend(data.user_id).getInfo().catch(() => { })
+          data.bot
+            .pickFriend(data.user_id)
+            .getInfo()
+            .catch(() => {})
           break
         case "notify":
           if (data.group_id) data.notice_type = "group"

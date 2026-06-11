@@ -1,4 +1,4 @@
-import Playwright from './lib/playwright.js'
+import Playwright from "./lib/playwright.js"
 
 /**
  * @param config 本地config.yaml的配置内容

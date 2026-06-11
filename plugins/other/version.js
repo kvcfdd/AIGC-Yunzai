@@ -2,7 +2,7 @@ let Common, Version
 try {
   Common = (await import("#miao")).Common
   Version = (await import("#miao")).Version
-} catch { }
+} catch {}
 
 export class version extends plugin {
   constructor() {
