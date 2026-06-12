@@ -24,7 +24,7 @@ export class AigcFallback extends plugin {
         { reg: /^#结束对话$/i, fnc: "clearConv" },
         { reg: /^#清除记忆$/i, fnc: "clearConvAndMem" },
         { reg: /^#结束全部对话$/i, fnc: "clearAllConv", permission: "master" },
-        { reg: /^#清除全部记忆$/i, fnc: "clearAllConvAndMem", permission: "master", },
+        { reg: /^#清除全部记忆$/i, fnc: "clearAllConvAndMem", permission: "master" },
         { reg: /^#知识库添加(.+)$/i, fnc: "kbAdd" },
         { reg: /^#知识库删除\s*(\S+)$/i, fnc: "kbRemove" },
         { reg: /^#知识库列表$/i, fnc: "kbList" },
@@ -63,7 +63,7 @@ export class AigcFallback extends plugin {
                   }
                 }
             }
-          } catch { }
+          } catch {}
           qq ? parts.push(segment.at(qq)) : parts.push({ type: "text", data: { text: m[0] } })
         }
       } else if (m[3]) {
@@ -189,7 +189,7 @@ export class AigcFallback extends plugin {
         const m = Bot.pickMember(this.e.group_id, qq)
         return m.card || m.nickname || String(qq)
       }
-    } catch { }
+    } catch {}
     return String(qq)
   }
 
@@ -292,8 +292,7 @@ export class AigcFallback extends plugin {
 
   /** System Prompt */
   _buildIdentity() {
-    const prompt =
-      cfg.aigc?.system_prompt || "你的名字叫云崽，一个智能助手。根据用户的提问提供有帮助的回答。"
+    const prompt = cfg.aigc?.system_prompt || "你的名字叫云崽，一个智能助手。根据用户的提问提供有帮助的回答。"
     return `## System Prompt\n${prompt}`
   }
 
@@ -307,14 +306,10 @@ export class AigcFallback extends plugin {
     lines.push(`- 你可以最多连续调用${MAX_TOOL_ROUNDS}轮工具,严禁超过限制的工具调用行为！`)
 
     if (cfg.aigc?.split_reply) {
-      lines.push(
-        "- 一句话讲不完就<x>拆成多条发,模仿人类打一句话发一句话的习惯,最多允许一次拆3条。注意不要为了拆而拆,而是按实际情况来决定要不要拆！例如: 好的呀<x>那就给你瞧瞧我的本事吧！",
-      )
+      lines.push("- 一句话讲不完就<x>拆成多条发,模仿人类打一句话发一句话的习惯,最多允许一次拆3条。注意不要为了拆而拆,而是按实际情况来决定要不要拆！例如: 好的呀<x>那就给你瞧瞧我的本事吧！")
     }
     if (e.isGroup) {
-      lines.push(
-        "- 群聊最近消息仅作为上下文提供给你,帮助你更好地理解当前对话环境,但你的回答不应受其影响。",
-      )
+      lines.push("- 群聊最近消息仅作为上下文提供给你,帮助你更好地理解当前对话环境,但你的回答不应受其影响。")
     }
 
     return `<system_supplement>\n${lines.join("\n")}\n</system_supplement>`
@@ -328,16 +323,12 @@ export class AigcFallback extends plugin {
       let botCard = ""
       try {
         botCard = e.group?.pickMember?.(e.self_id)?.card || ""
-      } catch { }
+      } catch {}
       const botName = botCard || Bot[e.self_id]?.nickname || ""
 
       const card = e.sender?.card || e.sender?.nickname || ""
-      const role =
-        { owner: "群主", admin: "群管理员", member: "群成员" }[e.member?.role] ||
-        e.member?.role ||
-        "群成员"
-      const sex =
-        { male: "男", female: "女", unknown: "未知" }[e.member?.sex] || e.member?.sex || "未知"
+      const role = { owner: "群主", admin: "群管理员", member: "群成员" }[e.member?.role] || e.member?.role || "群成员"
+      const sex = { male: "男", female: "女", unknown: "未知" }[e.member?.sex] || e.member?.sex || "未知"
 
       const lines = []
       lines.push(`- 类型: 群聊`)
@@ -345,13 +336,8 @@ export class AigcFallback extends plugin {
       lines.push(`- 你的群昵称: ${botName}`)
       lines.push(`- 你的QQ: ${e.self_id}`)
       lines.push(`- 你的头像: https://q.qlogo.cn/g?b=qq&s=0&nk=${e.self_id}`)
-      const avatar =
-        e.sender?.getAvatarUrl?.() ||
-        e.member?.getAvatarUrl?.() ||
-        `https://q.qlogo.cn/g?b=qq&s=0&nk=${e.user_id}`
-      lines.push(
-        `- 当前说话人: [${card}](QQ: ${e.user_id}, 性别: ${sex}, 群身份: ${role}, 头像: ${avatar})`,
-      )
+      const avatar = e.sender?.getAvatarUrl?.() || e.member?.getAvatarUrl?.() || `https://q.qlogo.cn/g?b=qq&s=0&nk=${e.user_id}`
+      lines.push(`- 当前说话人: [${card}](QQ: ${e.user_id}, 性别: ${sex}, 群身份: ${role}, 头像: ${avatar})`)
 
       const histCount = cfg.aigc?.group_history_count ?? 30
       if (histCount > 0) {
@@ -384,12 +370,8 @@ export class AigcFallback extends plugin {
         const sender = msg.sender || {}
         const name = sender.card || sender.nickname || "Unknown"
         const qq = sender.user_id || "?"
-        const sex =
-          { male: "男", female: "女", unknown: "未知" }[sender.sex] || sender.sex || "未知"
-        const role =
-          { owner: "群主", admin: "群管理员", member: "群成员" }[sender.role] ||
-          sender.role ||
-          "群成员"
+        const sex = { male: "男", female: "女", unknown: "未知" }[sender.sex] || sender.sex || "未知"
+        const role = { owner: "群主", admin: "群管理员", member: "群成员" }[sender.role] || sender.role || "群成员"
         let time = ""
         if (msg.time) {
           const d = new Date(msg.time * 1000)
@@ -607,9 +589,7 @@ export class AigcFallback extends plugin {
         await con().appendMessages(sessionKey, pending)
 
         if (res.reasoning_content && cfg.aigc?.show_thinking) {
-          const thinkingMsg = await common.makeForwardMsg(this.e, [
-            { type: "text", data: { text: res.reasoning_content } },
-          ])
+          const thinkingMsg = await common.makeForwardMsg(this.e, [{ type: "text", data: { text: res.reasoning_content } }])
           await this.reply(thinkingMsg, true)
         }
 

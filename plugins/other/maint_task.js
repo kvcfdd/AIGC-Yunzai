@@ -94,12 +94,9 @@ export class maintTask extends plugin {
       }
     }
 
-    const logText =
-      `维护完成 | Git成功:${stats.git.ok} 失败:${stats.git.fail} | ` +
-      `清理目录:${stats.clean.ok} (删文件:${stats.clean.fileCount})${proxyMsg}`
+    const logText = `维护完成 | Git成功:${stats.git.ok} 失败:${stats.git.fail} | ` + `清理目录:${stats.clean.ok} (删文件:${stats.clean.fileCount})${proxyMsg}`
 
-    if (stats.git.fail > 0 || stats.clean.fail > 0 || errParams.some(p => p.startsWith("代理:")))
-      logger.error(`[${this.name}] ${logText}`)
+    if (stats.git.fail > 0 || stats.clean.fail > 0 || errParams.some(p => p.startsWith("代理:"))) logger.error(`[${this.name}] ${logText}`)
     else logger.mark(`[${this.name}] ${logText}`)
 
     if (isManual && e) {

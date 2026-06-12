@@ -44,9 +44,7 @@ export class master extends plugin {
     if (this.e.isMaster) return this.reply(`[${this.e.user_id}] 已经为主人`, true)
 
     code[`${this.e.self_id}:${this.e.user_id}`] = ulid()
-    logger.mark(
-      `${logger.cyan(`[${this.e.user_id}]`)} 设置主人验证码 ${logger.green(code[`${this.e.self_id}:${this.e.user_id}`])}`,
-    )
+    logger.mark(`${logger.cyan(`[${this.e.user_id}]`)} 设置主人验证码 ${logger.green(code[`${this.e.self_id}:${this.e.user_id}`])}`)
     this.setContext("verify")
     return this.reply(`[${this.e.user_id}] 请输入验证码`, true)
   }

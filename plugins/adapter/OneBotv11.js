@@ -94,12 +94,7 @@ Bot.adapter.push(
       return this.sendMsg(
         msg,
         message => {
-          Bot.makeLog(
-            "info",
-            `发送好友消息：${this.makeLog(message)}`,
-            `${data.self_id} => ${data.user_id}`,
-            true,
-          )
+          Bot.makeLog("info", `发送好友消息：${this.makeLog(message)}`, `${data.self_id} => ${data.user_id}`, true)
           return data.bot.sendApi("send_private_msg", { user_id: data.user_id, message })
         },
         msg => this.sendFriendForwardMsg(data, msg),
@@ -110,12 +105,7 @@ Bot.adapter.push(
       return this.sendMsg(
         msg,
         message => {
-          Bot.makeLog(
-            "info",
-            `发送群消息：${this.makeLog(message)}`,
-            `${data.self_id} => ${data.group_id}`,
-            true,
-          )
+          Bot.makeLog("info", `发送群消息：${this.makeLog(message)}`, `${data.self_id} => ${data.group_id}`, true)
           return data.bot.sendApi("send_group_msg", { group_id: data.group_id, message })
         },
         msg => this.sendGroupForwardMsg(data, msg),
@@ -126,8 +116,7 @@ Bot.adapter.push(
       Bot.makeLog("info", `撤回消息：${message_id}`, data.self_id)
       if (!Array.isArray(message_id)) message_id = [message_id]
       const msgs = []
-      for (const i of message_id)
-        msgs.push(await data.bot.sendApi("delete_msg", { message_id: i }).catch(e => e))
+      for (const i of message_id) msgs.push(await data.bot.sendApi("delete_msg", { message_id: i }).catch(e => e))
       return msgs
     }
 
@@ -154,8 +143,7 @@ Bot.adapter.push(
           reverseOrder,
         })
       ).data?.messages
-      for (const i of Array.isArray(msgs) ? msgs : [msgs])
-        if (i?.message) i.message = this.parseMsg(i.message)
+      for (const i of Array.isArray(msgs) ? msgs : [msgs]) if (i?.message) i.message = this.parseMsg(i.message)
       return msgs
     }
 
@@ -168,15 +156,13 @@ Bot.adapter.push(
           reverseOrder,
         })
       ).data?.messages
-      for (const i of Array.isArray(msgs) ? msgs : [msgs])
-        if (i?.message) i.message = this.parseMsg(i.message)
+      for (const i of Array.isArray(msgs) ? msgs : [msgs]) if (i?.message) i.message = this.parseMsg(i.message)
       return msgs
     }
 
     async getForwardMsg(data, message_id) {
       const msgs = (await data.bot.sendApi("get_forward_msg", { message_id })).data?.messages
-      for (const i of Array.isArray(msgs) ? msgs : [msgs])
-        if (i?.message) i.message = this.parseMsg(i.message || i.content)
+      for (const i of Array.isArray(msgs) ? msgs : [msgs]) if (i?.message) i.message = this.parseMsg(i.message || i.content)
       return msgs
     }
 
@@ -202,12 +188,7 @@ Bot.adapter.push(
     }
 
     async sendFriendForwardMsg(data, msg) {
-      Bot.makeLog(
-        "info",
-        `发送好友转发消息：${this.makeLog(msg)}`,
-        `${data.self_id} => ${data.user_id}`,
-        true,
-      )
+      Bot.makeLog("info", `发送好友转发消息：${this.makeLog(msg)}`, `${data.self_id} => ${data.user_id}`, true)
       return data.bot.sendApi("send_private_forward_msg", {
         user_id: data.user_id,
         messages: await this.makeForwardMsg(msg, data),
@@ -215,12 +196,7 @@ Bot.adapter.push(
     }
 
     async sendGroupForwardMsg(data, msg) {
-      Bot.makeLog(
-        "info",
-        `发送群转发消息：${this.makeLog(msg)}`,
-        `${data.self_id} => ${data.group_id}`,
-        true,
-      )
+      Bot.makeLog("info", `发送群转发消息：${this.makeLog(msg)}`, `${data.self_id} => ${data.group_id}`, true)
       return data.bot.sendApi("send_group_forward_msg", {
         group_id: data.group_id,
         messages: await this.makeForwardMsg(msg, data),
@@ -264,9 +240,7 @@ Bot.adapter.push(
     }
 
     async getMemberArray(data) {
-      return (
-        (await data.bot.sendApi("get_group_member_list", { group_id: data.group_id })).data || []
-      )
+      return (await data.bot.sendApi("get_group_member_list", { group_id: data.group_id })).data || []
     }
     async getMemberList(data) {
       return (await this.getMemberArray(data)).map(i => i.user_id)
@@ -280,8 +254,7 @@ Bot.adapter.push(
 
     async getGroupMemberMap(data) {
       if (!cfg.bot.cache_group_member) return this.getGroupMap(data)
-      for (const [group_id] of await this.getGroupMap(data))
-        await this.getMemberMap({ ...data, group_id })
+      for (const [group_id] of await this.getGroupMap(data)) await this.getMemberMap({ ...data, group_id })
     }
     async getMemberInfo(data) {
       const info = (
@@ -328,32 +301,17 @@ Bot.adapter.push(
     }
 
     setGroupAdmin(data, user_id, enable) {
-      Bot.makeLog(
-        "info",
-        `${enable ? "设置" : "取消"}群管理员：${user_id}`,
-        `${data.self_id} => ${data.group_id}`,
-        true,
-      )
+      Bot.makeLog("info", `${enable ? "设置" : "取消"}群管理员：${user_id}`, `${data.self_id} => ${data.group_id}`, true)
       return data.bot.sendApi("set_group_admin", { group_id: data.group_id, user_id, enable })
     }
 
     setGroupCard(data, user_id, card) {
-      Bot.makeLog(
-        "info",
-        `设置群名片：${card}`,
-        `${data.self_id} => ${data.group_id}, ${user_id}`,
-        true,
-      )
+      Bot.makeLog("info", `设置群名片：${card}`, `${data.self_id} => ${data.group_id}, ${user_id}`, true)
       return data.bot.sendApi("set_group_card", { group_id: data.group_id, user_id, card })
     }
 
     setGroupTitle(data, user_id, special_title, duration) {
-      Bot.makeLog(
-        "info",
-        `设置群头衔：${special_title} ${duration}`,
-        `${data.self_id} => ${data.group_id}, ${user_id}`,
-        true,
-      )
+      Bot.makeLog("info", `设置群头衔：${special_title} ${duration}`, `${data.self_id} => ${data.group_id}, ${user_id}`, true)
       return data.bot.sendApi("set_group_special_title", {
         group_id: data.group_id,
         user_id,
@@ -368,32 +326,17 @@ Bot.adapter.push(
     }
 
     setGroupBan(data, user_id, duration) {
-      Bot.makeLog(
-        "info",
-        `禁言群成员：${duration}秒`,
-        `${data.self_id} => ${data.group_id}, ${user_id}`,
-        true,
-      )
+      Bot.makeLog("info", `禁言群成员：${duration}秒`, `${data.self_id} => ${data.group_id}, ${user_id}`, true)
       return data.bot.sendApi("set_group_ban", { group_id: data.group_id, user_id, duration })
     }
 
     setGroupWholeKick(data, enable) {
-      Bot.makeLog(
-        "info",
-        `${enable ? "开启" : "关闭"}全员禁言`,
-        `${data.self_id} => ${data.group_id}`,
-        true,
-      )
+      Bot.makeLog("info", `${enable ? "开启" : "关闭"}全员禁言`, `${data.self_id} => ${data.group_id}`, true)
       return data.bot.sendApi("set_group_whole_ban", { group_id: data.group_id, enable })
     }
 
     setGroupKick(data, user_id, reject_add_request) {
-      Bot.makeLog(
-        "info",
-        `踢出群成员${reject_add_request ? "拒绝再次加群" : ""}`,
-        `${data.self_id} => ${data.group_id}, ${user_id}`,
-        true,
-      )
+      Bot.makeLog("info", `踢出群成员${reject_add_request ? "拒绝再次加群" : ""}`, `${data.self_id} => ${data.group_id}, ${user_id}`, true)
       return data.bot.sendApi("set_group_kick", {
         group_id: data.group_id,
         user_id,
@@ -417,12 +360,7 @@ Bot.adapter.push(
     }
 
     async sendFriendFile(data, file, name = path.basename(file)) {
-      Bot.makeLog(
-        "info",
-        `发送好友文件：${name}(${file})`,
-        `${data.self_id} => ${data.user_id}`,
-        true,
-      )
+      Bot.makeLog("info", `发送好友文件：${name}(${file})`, `${data.self_id} => ${data.user_id}`, true)
       return data.bot.sendApi("upload_private_file", {
         user_id: data.user_id,
         file: (await this.makeFile(file, { file: true })).replace("file://", ""),
@@ -431,12 +369,7 @@ Bot.adapter.push(
     }
 
     async sendGroupFile(data, file, folder, name = path.basename(file)) {
-      Bot.makeLog(
-        "info",
-        `发送群文件：${folder || ""}/${name}(${file})`,
-        `${data.self_id} => ${data.group_id}`,
-        true,
-      )
+      Bot.makeLog("info", `发送群文件：${folder || ""}/${name}(${file})`, `${data.self_id} => ${data.group_id}`, true)
       return data.bot.sendApi("upload_group_file", {
         group_id: data.group_id,
         folder,
@@ -446,12 +379,7 @@ Bot.adapter.push(
     }
 
     deleteGroupFile(data, file_id, busid) {
-      Bot.makeLog(
-        "info",
-        `删除群文件：${file_id}(${busid})`,
-        `${data.self_id} => ${data.group_id}`,
-        true,
-      )
+      Bot.makeLog("info", `删除群文件：${file_id}(${busid})`, `${data.self_id} => ${data.group_id}`, true)
       return data.bot.sendApi("delete_group_file", { group_id: data.group_id, file_id, busid })
     }
 
@@ -490,9 +418,7 @@ Bot.adapter.push(
 
     deleteFriend(data) {
       Bot.makeLog("info", "删除好友", `${data.self_id} => ${data.user_id}`, true)
-      return data.bot
-        .sendApi("delete_friend", { user_id: data.user_id })
-        .finally(this.getFriendMap.bind(this, data))
+      return data.bot.sendApi("delete_friend", { user_id: data.user_id }).finally(this.getFriendMap.bind(this, data))
     }
 
     setFriendAddRequest(data, flag, approve, remark) {
@@ -519,12 +445,7 @@ Bot.adapter.push(
 
     sendPoke(data, group_id, user_id) {
       const target_id = user_id ?? data.user_id
-      Bot.makeLog(
-        "info",
-        `发送戳一戳：${target_id}`,
-        group_id ? `${data.self_id} => ${group_id}` : `${data.self_id} => ${target_id}`,
-        true,
-      )
+      Bot.makeLog("info", `发送戳一戳：${target_id}`, group_id ? `${data.self_id} => ${group_id}` : `${data.self_id} => ${target_id}`, true)
       if (group_id) return data.bot.sendApi("group_poke", { group_id, user_id: target_id })
       return data.bot.sendApi("friend_poke", { user_id: target_id })
     }
@@ -824,8 +745,7 @@ Bot.adapter.push(
         getInfoEx: this.getGroupInfoEx.bind(this, i),
         getDetailInfo: this.getGroupDetailInfo.bind(this, i),
         getIgnoredNotifies: this.getGroupIgnoredNotifies.bind(this, i),
-        kickMembers: (user_ids, reject_add_request) =>
-          this.setGroupKickMembers(i, user_ids, reject_add_request),
+        kickMembers: (user_ids, reject_add_request) => this.setGroupKickMembers(i, user_ids, reject_add_request),
         deleteFolder: folder_id => this.deleteGroupFolder(i, folder_id),
         forwardSingleMsg: message_id => this.forwardGroupSingleMsg(i, group_id, message_id),
         fs: this.getGroupFs(i),
@@ -911,21 +831,18 @@ Bot.adapter.push(
         removeEssenceMessage: this.deleteEssenceMsg.bind(this, data),
 
         sendPoke: (group_id, user_id) => this.sendPoke(data, group_id, user_id),
-        setMsgEmojiLike: (message_id, emoji_id, set) =>
-          this.setMsgEmojiLike(data, message_id, emoji_id, set),
+        setMsgEmojiLike: (message_id, emoji_id, set) => this.setMsgEmojiLike(data, message_id, emoji_id, set),
         getRecentContact: count => this.getRecentContact(data, count),
 
         getGroupAtAllRemain: group_id => this.getGroupAtAllRemain({ ...data, group_id }),
         getGroupSystemMsg: count => this.getGroupSystemMsg(data, count),
         getGroupShutList: group_id => this.getGroupShutList({ ...data, group_id }),
         getGroupDetailInfo: group_id => this.getGroupDetailInfo({ ...data, group_id }),
-        setGroupKickMembers: (group_id, user_ids, reject_add_request) =>
-          this.setGroupKickMembers({ ...data, group_id }, user_ids, reject_add_request),
+        setGroupKickMembers: (group_id, user_ids, reject_add_request) => this.setGroupKickMembers({ ...data, group_id }, user_ids, reject_add_request),
 
         markAllAsRead: this.markAllAsRead.bind(this, data),
         setOnlineStatus: status => this.setOnlineStatus(data, status),
-        setDiyOnlineStatus: (face_id, face_type, wording) =>
-          this.setDiyOnlineStatus(data, face_id, face_type, wording),
+        setDiyOnlineStatus: (face_id, face_type, wording) => this.setDiyOnlineStatus(data, face_id, face_type, wording),
         setSelfLongnick: longnick => this.setSelfLongnick(data, longnick),
 
         getProfileLike: start_time => this.getProfileLike(data, start_time),
@@ -933,8 +850,7 @@ Bot.adapter.push(
         getRecord: (file, out_format) => this.getRecord(data, file, out_format),
         canSendImage: this.canSendImage.bind(this, data),
         canSendRecord: this.canSendRecord.bind(this, data),
-        downloadFile: (url, thread_count, headers) =>
-          this.downloadFile(data, url, thread_count, headers),
+        downloadFile: (url, thread_count, headers) => this.downloadFile(data, url, thread_count, headers),
         getStatus: this.getStatus.bind(this, data),
 
         getUnidirectionalFriendList: this.getUnidirectionalFriendList.bind(this, data),
@@ -942,14 +858,11 @@ Bot.adapter.push(
         checkUrlSafely: url => this.checkUrlSafely(data, url),
         ocrImage: image => this.ocrImage(data, image),
 
-        forwardFriendSingleMsg: (user_id, message_id) =>
-          this.forwardFriendSingleMsg(data, user_id, message_id),
-        forwardGroupSingleMsg: (group_id, message_id) =>
-          this.forwardGroupSingleMsg(data, group_id, message_id),
+        forwardFriendSingleMsg: (user_id, message_id) => this.forwardFriendSingleMsg(data, user_id, message_id),
+        forwardGroupSingleMsg: (group_id, message_id) => this.forwardGroupSingleMsg(data, group_id, message_id),
 
         getAiCharacters: (group_id, chat_type) => this.getAiCharacters(data, group_id, chat_type),
-        sendGroupAiRecord: (group_id, character, text) =>
-          this.sendGroupAiRecord(data, group_id, character, text),
+        sendGroupAiRecord: (group_id, character, text) => this.sendGroupAiRecord(data, group_id, character, text),
         clickInlineKeyboardButton: params => this.clickInlineKeyboardButton(data, params),
 
         getRkey: domain => this.getRkey(data, domain),
@@ -976,9 +889,7 @@ Bot.adapter.push(
 
       if (!Bot.uin.includes(data.self_id)) Bot.uin.push(data.self_id)
 
-      data.bot
-        .sendApi("_set_model_show", { model: data.bot.model, model_show: data.bot.model })
-        .catch(() => {})
+      data.bot.sendApi("_set_model_show", { model: data.bot.model, model_show: data.bot.model }).catch(() => {})
 
       data.bot.info = (await data.bot.sendApi("get_login_info").catch(i => i.error)).data
       data.bot.clients = (await data.bot.sendApi("get_online_clients").catch(i => i.error)).clients
@@ -996,11 +907,7 @@ Bot.adapter.push(
       data.bot.getFriendMap()
       data.bot.getGroupMemberMap()
 
-      Bot.makeLog(
-        "mark",
-        `${this.name}(${this.id}) ${data.bot.version.version} 已连接`,
-        data.self_id,
-      )
+      Bot.makeLog("mark", `${this.name}(${this.id}) ${data.bot.version.version} 已连接`, data.self_id)
       Bot.em(`connect.${data.self_id}`, data)
     }
 
@@ -1009,30 +916,18 @@ Bot.adapter.push(
       return this.enrichMessage(data).then(() => {
         switch (data.message_type) {
           case "private": {
-            const name =
-              data.sender?.card || data.sender?.nickname || data.bot.fl.get(data.user_id)?.nickname
-            Bot.makeLog(
-              "info",
-              `好友消息：${name ? `[${name}] ` : ""}${data.raw_message}`,
-              `${data.self_id} <= ${data.user_id}`,
-              true,
-            )
+            const name = data.sender?.card || data.sender?.nickname || data.bot.fl.get(data.user_id)?.nickname
+            Bot.makeLog("info", `好友消息：${name ? `[${name}] ` : ""}${data.raw_message}`, `${data.self_id} <= ${data.user_id}`, true)
             break
           }
           case "group": {
             const group_name = data.group_name || data.bot.gl.get(data.group_id)?.group_name
             let user_name = data.sender?.card || data.sender?.nickname
             if (!user_name) {
-              const user =
-                data.bot.gml.get(data.group_id)?.get(data.user_id) || data.bot.fl.get(data.user_id)
+              const user = data.bot.gml.get(data.group_id)?.get(data.user_id) || data.bot.fl.get(data.user_id)
               if (user) user_name = user?.card || user?.nickname
             }
-            Bot.makeLog(
-              "info",
-              `群消息：${user_name ? `[${group_name ? `${group_name}, ` : ""}${user_name}] ` : ""}${data.raw_message}`,
-              `${data.self_id} <= ${data.group_id}, ${data.user_id}`,
-              true,
-            )
+            Bot.makeLog("info", `群消息：${user_name ? `[${group_name ? `${group_name}, ` : ""}${user_name}] ` : ""}${data.raw_message}`, `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
             break
           }
           default:
@@ -1058,8 +953,7 @@ Bot.adapter.push(
             reply.source_message = parsed
             if (images.length) {
               reply.images = images
-              for (const url of images)
-                data.message.push({ type: "image", file: url, url, sub_type: "reply" })
+              for (const url of images) data.message.push({ type: "image", file: url, url, sub_type: "reply" })
             }
           }
         } catch (err) {
@@ -1111,32 +1005,16 @@ Bot.adapter.push(
     async makeNotice(data) {
       switch (data.notice_type) {
         case "friend_recall":
-          Bot.makeLog(
-            "info",
-            `好友消息撤回：${data.message_id}`,
-            `${data.self_id} <= ${data.user_id}`,
-            true,
-          )
+          Bot.makeLog("info", `好友消息撤回：${data.message_id}`, `${data.self_id} <= ${data.user_id}`, true)
           break
         case "group_recall":
-          Bot.makeLog(
-            "info",
-            `群消息撤回：${data.operator_id} => ${data.user_id} ${data.message_id}`,
-            `${data.self_id} <= ${data.group_id}`,
-            true,
-          )
+          Bot.makeLog("info", `群消息撤回：${data.operator_id} => ${data.user_id} ${data.message_id}`, `${data.self_id} <= ${data.group_id}`, true)
           break
         case "group_increase": {
-          Bot.makeLog(
-            "info",
-            `群成员增加：${data.operator_id} => ${data.user_id} ${data.sub_type}`,
-            `${data.self_id} <= ${data.group_id}`,
-            true,
-          )
+          Bot.makeLog("info", `群成员增加：${data.operator_id} => ${data.user_id} ${data.sub_type}`, `${data.self_id} <= ${data.group_id}`, true)
           const group = data.bot.pickGroup(data.group_id)
           group.getInfo().catch(() => {})
-          if (data.user_id === data.self_id && cfg.bot.cache_group_member)
-            group.getMemberMap().catch(() => {})
+          if (data.user_id === data.self_id && cfg.bot.cache_group_member) group.getMemberMap().catch(() => {})
           else
             group
               .pickMember(data.user_id)
@@ -1145,12 +1023,7 @@ Bot.adapter.push(
           break
         }
         case "group_decrease":
-          Bot.makeLog(
-            "info",
-            `群成员减少：${data.operator_id} => ${data.user_id} ${data.sub_type}`,
-            `${data.self_id} <= ${data.group_id}`,
-            true,
-          )
+          Bot.makeLog("info", `群成员减少：${data.operator_id} => ${data.user_id} ${data.sub_type}`, `${data.self_id} <= ${data.group_id}`, true)
           if (data.user_id === data.self_id) {
             data.bot.gl.delete(data.group_id)
             data.bot.gml.delete(data.group_id)
@@ -1169,12 +1042,7 @@ Bot.adapter.push(
           }
           break
         case "group_admin":
-          Bot.makeLog(
-            "info",
-            `群管理员变动：${data.sub_type}`,
-            `${data.self_id} <= ${data.group_id}, ${data.user_id}`,
-            true,
-          )
+          Bot.makeLog("info", `群管理员变动：${data.sub_type}`, `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
           data.set = data.sub_type === "set"
           data.bot
             .pickMember(data.group_id, data.user_id)
@@ -1182,21 +1050,12 @@ Bot.adapter.push(
             .catch(() => {})
           break
         case "group_upload": {
-          Bot.makeLog(
-            "info",
-            `群文件上传：${Bot.String(data.file)}`,
-            `${data.self_id} <= ${data.group_id}, ${data.user_id}`,
-            true,
-          )
+          Bot.makeLog("info", `群文件上传：${Bot.String(data.file)}`, `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
           const file_id = data.file.id || data.file.file_id || data.file.file
           const seg = { ...data.file, type: "file" }
           const fileName = (data.file.name || "").toLowerCase()
           if (fileName.endsWith(".json") && file_id && !seg.url) {
-            const info = await this.resolveFileUrl(
-              { ...data, message_type: "group" },
-              file_id,
-              data.file.busid,
-            ).catch(err => {
+            const info = await this.resolveFileUrl({ ...data, message_type: "group" }, file_id, data.file.busid).catch(err => {
               Bot.makeLog("debug", [`获取群文件下载链接失败 ${file_id}`, err], data.self_id)
               return null
             })
@@ -1218,20 +1077,10 @@ Bot.adapter.push(
           break
         }
         case "group_ban":
-          Bot.makeLog(
-            "info",
-            `群禁言：${data.operator_id} => ${data.user_id} ${data.sub_type} ${data.duration}秒`,
-            `${data.self_id} <= ${data.group_id}`,
-            true,
-          )
+          Bot.makeLog("info", `群禁言：${data.operator_id} => ${data.user_id} ${data.sub_type} ${data.duration}秒`, `${data.self_id} <= ${data.group_id}`, true)
           break
         case "group_msg_emoji_like":
-          Bot.makeLog(
-            "info",
-            [`群消息回应：${data.message_id}`, data.likes],
-            `${data.self_id} <= ${data.group_id}, ${data.user_id}`,
-            true,
-          )
+          Bot.makeLog("info", [`群消息回应：${data.message_id}`, data.likes], `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
           break
         case "friend_add":
           Bot.makeLog("info", "好友添加", `${data.self_id} <= ${data.user_id}`, true)
@@ -1247,37 +1096,17 @@ Bot.adapter.push(
           switch (data.sub_type) {
             case "poke":
               data.operator_id = data.user_id
-              Bot.makeLog(
-                "info",
-                `${data.group_id ? "群" : "好友"}戳一戳：${data.operator_id} => ${data.target_id}`,
-                data.group_id ? `${data.self_id} <= ${data.group_id}` : data.self_id,
-                true,
-              )
+              Bot.makeLog("info", `${data.group_id ? "群" : "好友"}戳一戳：${data.operator_id} => ${data.target_id}`, data.group_id ? `${data.self_id} <= ${data.group_id}` : data.self_id, true)
               break
             case "poke_recall":
               data.operator_id = data.user_id
-              Bot.makeLog(
-                "info",
-                `${data.group_id ? "群" : "好友"}戳一戳撤回：${data.operator_id} => ${data.target_id}`,
-                data.group_id ? `${data.self_id} <= ${data.group_id}` : data.self_id,
-                true,
-              )
+              Bot.makeLog("info", `${data.group_id ? "群" : "好友"}戳一戳撤回：${data.operator_id} => ${data.target_id}`, data.group_id ? `${data.self_id} <= ${data.group_id}` : data.self_id, true)
               break
             case "honor":
-              Bot.makeLog(
-                "info",
-                `群荣誉：${data.honor_type}`,
-                `${data.self_id} <= ${data.group_id}, ${data.user_id}`,
-                true,
-              )
+              Bot.makeLog("info", `群荣誉：${data.honor_type}`, `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
               break
             case "title":
-              Bot.makeLog(
-                "info",
-                `群头衔：${data.title}`,
-                `${data.self_id} <= ${data.group_id}, ${data.user_id}`,
-                true,
-              )
+              Bot.makeLog("info", `群头衔：${data.title}`, `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
               break
             case "input_status":
               data.post_type = "internal"
@@ -1287,33 +1116,18 @@ Bot.adapter.push(
               Bot.makeLog("info", data.message, `${data.self_id} <= ${data.user_id}`, true)
               break
             case "profile_like":
-              Bot.makeLog(
-                "info",
-                `资料卡点赞：${data.times}次`,
-                `${data.self_id} <= ${data.operator_id}`,
-                true,
-              )
+              Bot.makeLog("info", `资料卡点赞：${data.times}次`, `${data.self_id} <= ${data.operator_id}`, true)
               break
             default:
               Bot.makeLog("warn", `未知通知：${logger.magenta(data.raw)}`, data.self_id)
           }
           break
         case "group_card":
-          Bot.makeLog(
-            "info",
-            `群名片更新：${data.card_old} => ${data.card_new}`,
-            `${data.self_id} <= ${data.group_id}, ${data.user_id}`,
-            true,
-          )
+          Bot.makeLog("info", `群名片更新：${data.card_old} => ${data.card_new}`, `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
           break
         case "essence":
           data.notice_type = "group_essence"
-          Bot.makeLog(
-            "info",
-            `群精华消息：${data.operator_id} => ${data.sender_id} ${data.sub_type} ${data.message_id}`,
-            `${data.self_id} <= ${data.group_id}`,
-            true,
-          )
+          Bot.makeLog("info", `群精华消息：${data.operator_id} => ${data.sender_id} ${data.sub_type} ${data.message_id}`, `${data.self_id} <= ${data.group_id}`, true)
           break
         case "bot_offline":
           data.post_type = "system"
@@ -1336,24 +1150,14 @@ Bot.adapter.push(
     makeRequest(data) {
       switch (data.request_type) {
         case "friend":
-          Bot.makeLog(
-            "info",
-            `加好友请求：${data.comment}(${data.flag})`,
-            `${data.self_id} <= ${data.user_id}`,
-            true,
-          )
+          Bot.makeLog("info", `加好友请求：${data.comment}(${data.flag})`, `${data.self_id} <= ${data.user_id}`, true)
           data.sub_type = "add"
           data.approve = function (approve, remark) {
             return this.bot.setFriendAddRequest(this.flag, approve, remark)
           }
           break
         case "group":
-          Bot.makeLog(
-            "info",
-            `加群请求：${data.sub_type} ${data.comment}(${data.flag})`,
-            `${data.self_id} <= ${data.group_id}, ${data.user_id}`,
-            true,
-          )
+          Bot.makeLog("info", `加群请求：${data.sub_type} ${data.comment}(${data.flag})`, `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
           data.approve = function (approve, reason) {
             return this.bot.setGroupAddRequest(this.flag, approve, reason, this.sub_type)
           }
@@ -1419,9 +1223,7 @@ Bot.adapter.push(
 
     load() {
       if (!Array.isArray(Bot.wsf[this.path])) Bot.wsf[this.path] = []
-      Bot.wsf[this.path].push((ws, ...args) =>
-        ws.on("message", data => this.message(data, ws, ...args)),
-      )
+      Bot.wsf[this.path].push((ws, ...args) => ws.on("message", data => this.message(data, ws, ...args)))
     }
   })(),
 )

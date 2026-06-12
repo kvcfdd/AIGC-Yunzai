@@ -46,9 +46,7 @@ export class sendLog extends plugin {
 
     if (lodash.isEmpty(log)) return this.reply(`暂无相关日志：${type}`)
 
-    return this.reply(
-      await Bot.makeForwardArray([`最近${log.length}条${type}日志`, log.join("\n")]),
-    )
+    return this.reply(await Bot.makeForwardArray([`最近${log.length}条${type}日志`, log.join("\n")]))
   }
 
   async getLog(logFile) {

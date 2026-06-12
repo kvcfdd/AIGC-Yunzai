@@ -33,15 +33,11 @@ Bot.adapter.push(
         wsProtocol = "wss"
       }
 
-      const baseUrl = cleanHost.includes(":")
-        ? `${protocol}://${cleanHost}${prefix}`
-        : `${protocol}://${cleanHost}:${port}${prefix}`
+      const baseUrl = cleanHost.includes(":") ? `${protocol}://${cleanHost}${prefix}` : `${protocol}://${cleanHost}:${port}${prefix}`
       const apiBaseUrl = `${baseUrl}/api`
 
       if (connection === "ws") {
-        const wsUrl = cleanHost.includes(":")
-          ? `${wsProtocol}://${cleanHost}${prefix}/event${cfg.milky.access_token ? `?access_token=${cfg.milky.access_token}` : ""}`
-          : `${wsProtocol}://${cleanHost}:${port}${prefix}/event${cfg.milky.access_token ? `?access_token=${cfg.milky.access_token}` : ""}`
+        const wsUrl = cleanHost.includes(":") ? `${wsProtocol}://${cleanHost}${prefix}/event${cfg.milky.access_token ? `?access_token=${cfg.milky.access_token}` : ""}` : `${wsProtocol}://${cleanHost}:${port}${prefix}/event${cfg.milky.access_token ? `?access_token=${cfg.milky.access_token}` : ""}`
         setTimeout(() => this.connectWs(apiBaseUrl, wsUrl), 12000)
       } else if (connection === "webhook") {
         setTimeout(() => this.setupWebhook(apiBaseUrl), 12000)
@@ -117,11 +113,7 @@ Bot.adapter.push(
       try {
         const loginInfo = await this.callApi(apiBaseUrl, cfg.milky.access_token, "get_login_info")
         if (loginInfo.retcode !== 0 || !loginInfo.data) {
-          Bot.makeLog(
-            "error",
-            `获取登录信息失败: ${loginInfo.error || loginInfo.wording || "unknown error"}`,
-            "Milky",
-          )
+          Bot.makeLog("error", `获取登录信息失败: ${loginInfo.error || loginInfo.wording || "unknown error"}`, "Milky")
           return
         }
 
@@ -130,8 +122,7 @@ Bot.adapter.push(
 
         if (exists) {
           Bot[self_id].ws = ws
-          Bot[self_id].sendApi = (action, params) =>
-            this.callApi(apiBaseUrl, cfg.milky.access_token, action, params)
+          Bot[self_id].sendApi = (action, params) => this.callApi(apiBaseUrl, cfg.milky.access_token, action, params)
           Bot[self_id].info = loginInfo.data
           Bot[self_id].nickname = loginInfo.data.nickname
           if (!Bot[self_id].stat) {
@@ -141,8 +132,7 @@ Bot.adapter.push(
           Bot[self_id] = {
             adapter: this,
             ws,
-            sendApi: (action, params) =>
-              this.callApi(apiBaseUrl, cfg.milky.access_token, action, params),
+            sendApi: (action, params) => this.callApi(apiBaseUrl, cfg.milky.access_token, action, params),
             info: loginInfo.data,
             get uin() {
               return this.info?.uin || this.info?.user_id
@@ -195,8 +185,7 @@ Bot.adapter.push(
         send_private_msg: (user_id, msg) => this.sendPrivateMsg(ctx({ user_id }), msg),
         send_group_msg: (group_id, msg) => this.sendGroupMsg(ctx({ group_id }), msg),
 
-        send_private_forward_msg: (user_id, msg) =>
-          this.sendPrivateForwardMsg(ctx({ user_id }), msg),
+        send_private_forward_msg: (user_id, msg) => this.sendPrivateForwardMsg(ctx({ user_id }), msg),
         sendFriendForwardMsg: (user_id, msg) => this.sendPrivateForwardMsg(ctx({ user_id }), msg),
         send_group_forward_msg: (group_id, msg) => this.sendGroupForwardMsg(ctx({ group_id }), msg),
         sendGroupForwardMsg: (group_id, msg) => this.sendGroupForwardMsg(ctx({ group_id }), msg),
@@ -214,8 +203,7 @@ Bot.adapter.push(
         get_group_list: () => this.getGroupList(ctx({})),
         get_group_info: group_id => this.getGroupInfo(ctx({ group_id })),
         get_group_member_list: group_id => this.getMemberList(ctx({ group_id })),
-        get_group_member_info: (group_id, user_id) =>
-          this.getMemberInfo(ctx({ group_id, user_id })),
+        get_group_member_info: (group_id, user_id) => this.getMemberInfo(ctx({ group_id, user_id })),
 
         get_impl_info: () => this.callApi(apiBaseUrl, token, "get_impl_info"),
         get_user_profile: user_id => this.getProfile(ctx({ user_id })),
@@ -223,73 +211,35 @@ Bot.adapter.push(
 
         send_friend_nudge: user_id => this.sendFriendNudge(ctx({ user_id })),
         send_group_nudge: (group_id, user_id) => this.sendGroupNudge(ctx({ group_id, user_id })),
-        send_group_message_reaction: (group_id, message_seq, reaction, is_add) =>
-          this.sendGroupMessageReaction(ctx({ group_id, message_seq }), reaction, is_add),
+        send_group_message_reaction: (group_id, message_seq, reaction, is_add) => this.sendGroupMessageReaction(ctx({ group_id, message_seq }), reaction, is_add),
 
-        set_group_essence_message: (group_id, message_seq, is_set) =>
-          this.setGroupEssenceMessage(ctx({ group_id, message_seq }), is_set),
-        get_group_essence_messages: (group_id, page_index, page_size) =>
-          this.getGroupEssenceMessages(ctx({ group_id }), page_index, page_size),
+        set_group_essence_message: (group_id, message_seq, is_set) => this.setGroupEssenceMessage(ctx({ group_id, message_seq }), is_set),
+        get_group_essence_messages: (group_id, page_index, page_size) => this.getGroupEssenceMessages(ctx({ group_id }), page_index, page_size),
 
-        send_group_announcement: (group_id, content, image_uri) =>
-          this.sendGroupAnnouncement(ctx({ group_id }), content, image_uri),
+        send_group_announcement: (group_id, content, image_uri) => this.sendGroupAnnouncement(ctx({ group_id }), content, image_uri),
         get_group_announcements: group_id => this.getGroupAnnouncements(ctx({ group_id })),
 
-        accept_friend_request: (initiator_uid, is_filtered) =>
-          this.acceptFriendRequest(ctx({}), initiator_uid, is_filtered),
-        reject_friend_request: (initiator_uid, is_filtered, reason) =>
-          this.rejectFriendRequest(ctx({}), initiator_uid, is_filtered, reason),
+        accept_friend_request: (initiator_uid, is_filtered) => this.acceptFriendRequest(ctx({}), initiator_uid, is_filtered),
+        reject_friend_request: (initiator_uid, is_filtered, reason) => this.rejectFriendRequest(ctx({}), initiator_uid, is_filtered, reason),
 
-        accept_group_request: (notification_seq, notification_type, group_id, is_filtered) =>
-          this.acceptGroupRequest(
-            ctx({}),
-            notification_seq,
-            notification_type,
-            group_id,
-            is_filtered,
-          ),
-        reject_group_request: (
-          notification_seq,
-          notification_type,
-          group_id,
-          is_filtered,
-          reason,
-        ) =>
-          this.rejectGroupRequest(
-            ctx({}),
-            notification_seq,
-            notification_type,
-            group_id,
-            is_filtered,
-            reason,
-          ),
+        accept_group_request: (notification_seq, notification_type, group_id, is_filtered) => this.acceptGroupRequest(ctx({}), notification_seq, notification_type, group_id, is_filtered),
+        reject_group_request: (notification_seq, notification_type, group_id, is_filtered, reason) => this.rejectGroupRequest(ctx({}), notification_seq, notification_type, group_id, is_filtered, reason),
 
-        accept_group_invitation: (group_id, invitation_seq) =>
-          this.acceptGroupInvitation(ctx({}), group_id, invitation_seq),
-        reject_group_invitation: (group_id, invitation_seq) =>
-          this.rejectGroupInvitation(ctx({}), group_id, invitation_seq),
+        accept_group_invitation: (group_id, invitation_seq) => this.acceptGroupInvitation(ctx({}), group_id, invitation_seq),
+        reject_group_invitation: (group_id, invitation_seq) => this.rejectGroupInvitation(ctx({}), group_id, invitation_seq),
 
-        recall_group_message: (group_id, message_seq) =>
-          this.recallGroupMsg(ctx({ group_id }), message_seq),
-        recall_private_message: (user_id, message_seq) =>
-          this.recallPrivateMsg(ctx({ user_id }), message_seq),
+        recall_group_message: (group_id, message_seq) => this.recallGroupMsg(ctx({ group_id }), message_seq),
+        recall_private_message: (user_id, message_seq) => this.recallPrivateMsg(ctx({ user_id }), message_seq),
         delete_msg: message_id => this.deleteMsg(ctx({}), message_id),
-        get_msg: (message_scene, peer_id, message_seq) =>
-          this.getMsg(ctx({ message_scene, peer_id, message_seq })),
-        get_history_messages: (message_scene, peer_id, start_message_seq, limit) =>
-          this.getHistoryMessages(ctx({ message_scene, peer_id, start_message_seq, limit })),
-        mark_message_as_read: (message_scene, peer_id, message_seq) =>
-          this.markMessageAsRead(ctx({}), message_scene, peer_id, message_seq),
+        get_msg: (message_scene, peer_id, message_seq) => this.getMsg(ctx({ message_scene, peer_id, message_seq })),
+        get_history_messages: (message_scene, peer_id, start_message_seq, limit) => this.getHistoryMessages(ctx({ message_scene, peer_id, start_message_seq, limit })),
+        mark_message_as_read: (message_scene, peer_id, message_seq) => this.markMessageAsRead(ctx({}), message_scene, peer_id, message_seq),
 
         set_group_name: (group_id, group_name) => this.setGroupName(ctx({ group_id }), group_name),
-        set_group_card: (group_id, user_id, card) =>
-          this.setGroupCard(ctx({ group_id }), user_id, card),
-        set_group_admin: (group_id, user_id, enable) =>
-          this.setGroupAdmin(ctx({ group_id }), user_id, enable),
-        set_group_special_title: (group_id, user_id, title) =>
-          this.setGroupSpecialTitle(ctx({ group_id }), user_id, title),
-        set_group_ban: (group_id, user_id, duration) =>
-          this.setGroupBan(ctx({ group_id }), user_id, duration),
+        set_group_card: (group_id, user_id, card) => this.setGroupCard(ctx({ group_id }), user_id, card),
+        set_group_admin: (group_id, user_id, enable) => this.setGroupAdmin(ctx({ group_id }), user_id, enable),
+        set_group_special_title: (group_id, user_id, title) => this.setGroupSpecialTitle(ctx({ group_id }), user_id, title),
+        set_group_ban: (group_id, user_id, duration) => this.setGroupBan(ctx({ group_id }), user_id, duration),
         set_group_whole_ban: (group_id, enable) => this.setGroupWholeBan(ctx({ group_id }), enable),
         set_group_kick: (group_id, user_id) => this.setGroupKick(ctx({ group_id }), user_id),
         set_group_leave: group_id => this.setGroupLeave(ctx({ group_id })),
@@ -297,15 +247,11 @@ Bot.adapter.push(
         send_like: (user_id, times) => this.sendLike(ctx({}), user_id, times),
         delete_friend: user_id => this.deleteFriend(ctx({}), user_id),
 
-        upload_group_file: (group_id, file, folder, name) =>
-          this.uploadGroupFile(ctx({ group_id }), file, folder, name),
+        upload_group_file: (group_id, file, folder, name) => this.uploadGroupFile(ctx({ group_id }), file, folder, name),
         delete_group_file: (group_id, file_id) => this.deleteGroupFile(ctx({ group_id }), file_id),
-        get_group_files: (group_id, folder_id) =>
-          this.getGroupFilesList(ctx({ group_id }), folder_id),
-        create_group_folder: (group_id, name) =>
-          this.createGroupFileFolder(ctx({ group_id }), name),
-        delete_group_folder: (group_id, folder_id) =>
-          this.deleteGroupFileFolder(ctx({ group_id }), folder_id),
+        get_group_files: (group_id, folder_id) => this.getGroupFilesList(ctx({ group_id }), folder_id),
+        create_group_folder: (group_id, name) => this.createGroupFileFolder(ctx({ group_id }), name),
+        delete_group_folder: (group_id, folder_id) => this.deleteGroupFileFolder(ctx({ group_id }), folder_id),
       })
 
       if (!Object.getOwnPropertyDescriptor(bot, "pickUser")) {
@@ -331,34 +277,18 @@ Bot.adapter.push(
           delete Bot[self_id].apk
 
           if (type === "connect") {
-            Bot.makeLog(
-              "mark",
-              `MilkyAdapter v${this.version} [${name} v${version}] ${Bot[self_id].nickname}(${self_id}) 已连接`,
-              self_id,
-            )
+            Bot.makeLog("mark", `MilkyAdapter v${this.version} [${name} v${version}] ${Bot[self_id].nickname}(${self_id}) 已连接`, self_id)
           } else {
-            Bot.makeLog(
-              "mark",
-              `MilkyAdapter v${this.version} [${name} v${version}] ${Bot[self_id].nickname}(${self_id}) 已重连`,
-              self_id,
-            )
+            Bot.makeLog("mark", `MilkyAdapter v${this.version} [${name} v${version}] ${Bot[self_id].nickname}(${self_id}) 已重连`, self_id)
           }
           return
         }
       } catch {}
 
       if (type === "connect") {
-        Bot.makeLog(
-          "mark",
-          `MilkyAdapter v${this.version} ${Bot[self_id].nickname}(${self_id}) 已连接`,
-          self_id,
-        )
+        Bot.makeLog("mark", `MilkyAdapter v${this.version} ${Bot[self_id].nickname}(${self_id}) 已连接`, self_id)
       } else {
-        Bot.makeLog(
-          "mark",
-          `MilkyAdapter v${this.version} ${Bot[self_id].nickname}(${self_id}) 已重连`,
-          self_id,
-        )
+        Bot.makeLog("mark", `MilkyAdapter v${this.version} ${Bot[self_id].nickname}(${self_id}) 已重连`, self_id)
       }
     }
 
@@ -512,9 +442,7 @@ Bot.adapter.push(
       delete data.friend
 
       data.message = this.parseMsg(data.segments)
-      data.raw_message = data.message
-        .map(m => (m.type === "text" ? m.text : `[${m.type}]`))
-        .join("")
+      data.raw_message = data.message.map(m => (m.type === "text" ? m.text : `[${m.type}]`)).join("")
 
       const group_name = data.group_id ? data.bot.gl.get(data.group_id)?.group_name : null
       let user_name = data.bot.fl.get(data.user_id)?.nickname
@@ -539,11 +467,7 @@ Bot.adapter.push(
       const logMsg = data.raw_message.replace(/base64:\/\/([^"]+)/g, "base64://...")
       if (data.message_type === "group") {
         const logUin = `${data.self_id} <= ${data.group_id}, ${data.user_id}`
-        Bot.makeLog(
-          "info",
-          `群消息：[${group_name || data.group_id}, ${user_name || data.user_id}] ${logMsg}`,
-          logUin,
-        )
+        Bot.makeLog("info", `群消息：[${group_name || data.group_id}, ${user_name || data.user_id}] ${logMsg}`, logUin)
       } else {
         const logUin = `${data.self_id} <= ${data.user_id}`
         Bot.makeLog("info", `好友消息：[${user_name || data.user_id}] ${logMsg}`, logUin)
@@ -563,19 +487,9 @@ Bot.adapter.push(
           data.user_id = String(data.sender_id)
           data.message_id = String(data.message_seq)
           if (data.message_scene === "group") {
-            Bot.makeLog(
-              "info",
-              `群消息撤回：${data.operator_id} => ${data.user_id} ${data.message_id}`,
-              `${data.self_id} <= ${data.group_id}`,
-              true,
-            )
+            Bot.makeLog("info", `群消息撤回：${data.operator_id} => ${data.user_id} ${data.message_id}`, `${data.self_id} <= ${data.group_id}`, true)
           } else {
-            Bot.makeLog(
-              "info",
-              `好友消息撤回：${data.message_id}`,
-              `${data.self_id} <= ${data.user_id}`,
-              true,
-            )
+            Bot.makeLog("info", `好友消息撤回：${data.message_id}`, `${data.self_id} <= ${data.user_id}`, true)
           }
           break
 
@@ -585,11 +499,7 @@ Bot.adapter.push(
           data.user_id = String(data.user_id)
           data.operator_id = data.is_self_send ? data.self_id : data.user_id
           data.target_id = data.is_self_receive ? data.self_id : data.user_id
-          Bot.makeLog(
-            "info",
-            `好友戳一戳：[${data.operator_id} => ${data.target_id}]`,
-            data.self_id,
-          )
+          Bot.makeLog("info", `好友戳一戳：[${data.operator_id} => ${data.target_id}]`, data.self_id)
           break
 
         case "group_nudge":
@@ -599,11 +509,7 @@ Bot.adapter.push(
           data.operator_id = String(data.sender_id)
           data.target_id = String(data.receiver_id)
           data.user_id = data.operator_id
-          Bot.makeLog(
-            "info",
-            `群戳一戳：[${data.group_id}: ${data.operator_id} => ${data.target_id}]`,
-            data.self_id,
-          )
+          Bot.makeLog("info", `群戳一戳：[${data.group_id}: ${data.operator_id} => ${data.target_id}]`, data.self_id)
           break
 
         case "group_admin_change":
@@ -611,12 +517,7 @@ Bot.adapter.push(
           data.sub_type = data.is_set ? "set" : "unset"
           data.group_id = String(data.group_id)
           data.user_id = String(data.user_id)
-          Bot.makeLog(
-            "info",
-            `群管理员变更：${data.user_id} ${data.sub_type}`,
-            `${data.self_id} <= ${data.group_id}`,
-            true,
-          )
+          Bot.makeLog("info", `群管理员变更：${data.user_id} ${data.sub_type}`, `${data.self_id} <= ${data.group_id}`, true)
           break
 
         case "group_member_increase":
@@ -625,30 +526,16 @@ Bot.adapter.push(
           data.group_id = String(data.group_id)
           data.user_id = String(data.user_id)
           data.operator_id = String(data.operator_id || data.invitor_id)
-          Bot.makeLog(
-            "info",
-            `群成员增加：${data.operator_id} => ${data.user_id} ${data.sub_type}`,
-            `${data.self_id} <= ${data.group_id}`,
-            true,
-          )
+          Bot.makeLog("info", `群成员增加：${data.operator_id} => ${data.user_id} ${data.sub_type}`, `${data.self_id} <= ${data.group_id}`, true)
           break
 
         case "group_member_decrease":
           data.notice_type = "group_decrease"
-          data.sub_type = data.operator_id
-            ? data.operator_id == data.user_id
-              ? "leave"
-              : "kick"
-            : "leave"
+          data.sub_type = data.operator_id ? (data.operator_id == data.user_id ? "leave" : "kick") : "leave"
           data.group_id = String(data.group_id)
           data.user_id = String(data.user_id)
           data.operator_id = String(data.operator_id || data.user_id)
-          Bot.makeLog(
-            "info",
-            `群成员减少：${data.operator_id} => ${data.user_id} ${data.sub_type}`,
-            `${data.self_id} <= ${data.group_id}`,
-            true,
-          )
+          Bot.makeLog("info", `群成员减少：${data.operator_id} => ${data.user_id} ${data.sub_type}`, `${data.self_id} <= ${data.group_id}`, true)
           break
 
         case "group_mute":
@@ -658,12 +545,7 @@ Bot.adapter.push(
           data.user_id = String(data.user_id)
           data.operator_id = String(data.operator_id)
           data.duration = data.duration || 0
-          Bot.makeLog(
-            "info",
-            `群禁言：${data.operator_id} => ${data.user_id} ${data.sub_type} ${data.duration}秒`,
-            `${data.self_id} <= ${data.group_id}`,
-            true,
-          )
+          Bot.makeLog("info", `群禁言：${data.operator_id} => ${data.user_id} ${data.sub_type} ${data.duration}秒`, `${data.self_id} <= ${data.group_id}`, true)
           break
 
         case "group_whole_mute":
@@ -672,12 +554,7 @@ Bot.adapter.push(
           data.group_id = String(data.group_id)
           data.user_id = "0"
           data.operator_id = String(data.operator_id)
-          Bot.makeLog(
-            "info",
-            `全员禁言：${data.operator_id} ${data.sub_type}`,
-            `${data.self_id} <= ${data.group_id}`,
-            true,
-          )
+          Bot.makeLog("info", `全员禁言：${data.operator_id} ${data.sub_type}`, `${data.self_id} <= ${data.group_id}`, true)
           break
 
         case "group_message_reaction":
@@ -686,24 +563,14 @@ Bot.adapter.push(
           data.user_id = String(data.user_id)
           data.message_id = String(data.message_seq)
           data.likes = [{ emoji_id: String(data.face_id), count: data.is_add ? 1 : 0 }]
-          Bot.makeLog(
-            "info",
-            [`群消息回应：${data.message_id}`, data.likes],
-            `${data.self_id} <= ${data.group_id}, ${data.user_id}`,
-            true,
-          )
+          Bot.makeLog("info", [`群消息回应：${data.message_id}`, data.likes], `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
           break
 
         case "group_name_change":
           data.notice_type = "group_card"
           data.group_id = String(data.group_id)
           data.user_id = String(data.operator_id)
-          Bot.makeLog(
-            "info",
-            `群名变更：${data.old_name} => ${data.new_name}`,
-            `${data.self_id} <= ${data.group_id}`,
-            true,
-          )
+          Bot.makeLog("info", `群名变更：${data.old_name} => ${data.new_name}`, `${data.self_id} <= ${data.group_id}`, true)
           break
 
         case "group_essence_message_change":
@@ -712,12 +579,7 @@ Bot.adapter.push(
           data.group_id = String(data.group_id)
           data.operator_id = String(data.operator_id)
           data.message_id = String(data.message_seq)
-          Bot.makeLog(
-            "info",
-            `群精华消息：${data.operator_id} ${data.sub_type} ${data.message_id}`,
-            `${data.self_id} <= ${data.group_id}`,
-            true,
-          )
+          Bot.makeLog("info", `群精华消息：${data.operator_id} ${data.sub_type} ${data.message_id}`, `${data.self_id} <= ${data.group_id}`, true)
           break
 
         case "friend_file_upload":
@@ -728,12 +590,7 @@ Bot.adapter.push(
             size: data.file_size,
             url: data.file_id,
           }
-          Bot.makeLog(
-            "info",
-            `好友文件上传：${data.file_name}`,
-            `${data.self_id} <= ${data.user_id}`,
-            true,
-          )
+          Bot.makeLog("info", `好友文件上传：${data.file_name}`, `${data.self_id} <= ${data.user_id}`, true)
           break
 
         default:
@@ -760,32 +617,16 @@ Bot.adapter.push(
         data.user_id = String(data.initiator_id)
         data.comment = data.comment
         data.flag = data.initiator_uid
-        Bot.makeLog(
-          "info",
-          `加好友请求：${data.comment}(${data.flag})`,
-          `${data.self_id} <= ${data.user_id}`,
-          true,
-        )
-        data.approve = approve =>
-          approve
-            ? data.bot.accept_friend_request(data.flag)
-            : data.bot.reject_friend_request(data.flag)
+        Bot.makeLog("info", `加好友请求：${data.comment}(${data.flag})`, `${data.self_id} <= ${data.user_id}`, true)
+        data.approve = approve => (approve ? data.bot.accept_friend_request(data.flag) : data.bot.reject_friend_request(data.flag))
       } else if (data.event_type === "group_invitation") {
         data.request_type = "group"
         data.sub_type = "invite"
         data.group_id = String(data.group_id)
         data.user_id = String(data.initiator_id)
         data.flag = String(data.invitation_seq)
-        Bot.makeLog(
-          "info",
-          `入群邀请：${data.group_id} 来自 ${data.user_id} (${data.flag})`,
-          `${data.self_id} <= ${data.group_id}`,
-          true,
-        )
-        data.approve = approve =>
-          approve
-            ? data.bot.accept_group_invitation(data.group_id, data.flag)
-            : data.bot.reject_group_invitation(data.group_id, data.flag)
+        Bot.makeLog("info", `入群邀请：${data.group_id} 来自 ${data.user_id} (${data.flag})`, `${data.self_id} <= ${data.group_id}`, true)
+        data.approve = approve => (approve ? data.bot.accept_group_invitation(data.group_id, data.flag) : data.bot.reject_group_invitation(data.group_id, data.flag))
       } else {
         data.request_type = "group"
         data.sub_type = data.event_type === "group_join_request" ? "add" : "invite"
@@ -793,24 +634,8 @@ Bot.adapter.push(
         data.user_id = String(data.initiator_id)
         data.comment = data.comment
         data.flag = String(data.notification_seq)
-        Bot.makeLog(
-          "info",
-          `加群请求：${data.sub_type} ${data.comment}(${data.flag})`,
-          `${data.self_id} <= ${data.group_id}, ${data.user_id}`,
-          true,
-        )
-        data.approve = approve =>
-          approve
-            ? data.bot.accept_group_request(
-                data.flag,
-                data.sub_type === "add" ? "join_request" : "invited_join_request",
-                data.group_id,
-              )
-            : data.bot.reject_group_request(
-                data.flag,
-                data.sub_type === "add" ? "join_request" : "invited_join_request",
-                data.group_id,
-              )
+        Bot.makeLog("info", `加群请求：${data.sub_type} ${data.comment}(${data.flag})`, `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
+        data.approve = approve => (approve ? data.bot.accept_group_request(data.flag, data.sub_type === "add" ? "join_request" : "invited_join_request", data.group_id) : data.bot.reject_group_request(data.flag, data.sub_type === "add" ? "join_request" : "invited_join_request", data.group_id))
       }
 
       Bot.em(`${data.post_type}.${data.request_type}.${data.sub_type}`, data)
@@ -1077,10 +902,7 @@ Bot.adapter.push(
       let res
 
       if (forward.length) {
-        res =
-          scene === "group"
-            ? await this.sendGroupForwardMsg(data, forward)
-            : await this.sendPrivateForwardMsg(data, forward)
+        res = scene === "group" ? await this.sendGroupForwardMsg(data, forward) : await this.sendPrivateForwardMsg(data, forward)
       }
 
       if (!message.length) return res
@@ -1089,16 +911,10 @@ Bot.adapter.push(
       const { targetName, logUin } = this.getTargetLogInfo(data, scene)
 
       const action = scene === "group" ? "send_group_message" : "send_private_message"
-      const params =
-        scene === "group"
-          ? { group_id: Number(data.group_id), message }
-          : { user_id: Number(data.user_id), message }
+      const params = scene === "group" ? { group_id: Number(data.group_id), message } : { user_id: Number(data.user_id), message }
 
       return this.execApi(data, action, params, {
-        logSuccess:
-          scene === "group"
-            ? `发送群消息：[${targetName}] ${logMsg}`
-            : `发送好友消息：[${targetName}] ${logMsg}`,
+        logSuccess: scene === "group" ? `发送群消息：[${targetName}] ${logMsg}` : `发送好友消息：[${targetName}] ${logMsg}`,
         logFail: scene === "group" ? `发送群消息失败` : `发送好友消息失败`,
         logUin,
       })
@@ -1109,16 +925,10 @@ Bot.adapter.push(
       const { targetName, logUin } = this.getTargetLogInfo(data, scene)
 
       const action = scene === "group" ? "send_group_message" : "send_private_message"
-      const params =
-        scene === "group"
-          ? { group_id: Number(data.group_id), message }
-          : { user_id: Number(data.user_id), message }
+      const params = scene === "group" ? { group_id: Number(data.group_id), message } : { user_id: Number(data.user_id), message }
 
       return this.execApi(data, action, params, {
-        logSuccess:
-          scene === "group"
-            ? `发送群合并转发消息：[${targetName}]`
-            : `发送好友合并转发消息：[${targetName}]`,
+        logSuccess: scene === "group" ? `发送群合并转发消息：[${targetName}]` : `发送好友合并转发消息：[${targetName}]`,
         logFail: scene === "group" ? `发送群合并转发消息失败` : `发送好友合并转发消息失败`,
         logUin,
       })
@@ -1152,8 +962,7 @@ Bot.adapter.push(
         poke: () => this.sendFriendNudge(i),
         thumbUp: times => this.sendLike(i, user_id, times),
         delete: () => this.deleteFriend(i, user_id),
-        getMsg: message_seq =>
-          this.getMsg({ ...i, message_scene: "private", peer_id: Number(user_id), message_seq }),
+        getMsg: message_seq => this.getMsg({ ...i, message_scene: "private", peer_id: Number(user_id), message_seq }),
         getHistory: (start_message_seq, limit = 20) =>
           this.getHistoryMessages({
             ...i,
@@ -1183,8 +992,7 @@ Bot.adapter.push(
         addEssence: message_seq => this.setGroupEssenceMessage({ ...i, message_seq }, true),
         removeEssence: message_seq => this.setGroupEssenceMessage({ ...i, message_seq }, false),
         getEssence: (page = 0, size = 50) => this.getGroupEssenceMessages(i, page, size),
-        getMsg: message_seq =>
-          this.getMsg({ ...i, message_scene: "group", peer_id: Number(group_id), message_seq }),
+        getMsg: message_seq => this.getMsg({ ...i, message_scene: "group", peer_id: Number(group_id), message_seq }),
         getHistory: (start_message_seq, limit = 20) =>
           this.getHistoryMessages({
             ...i,
@@ -1583,13 +1391,7 @@ Bot.adapter.push(
       )
     }
 
-    async acceptGroupRequest(
-      data,
-      notification_seq,
-      notification_type,
-      group_id,
-      is_filtered = false,
-    ) {
+    async acceptGroupRequest(data, notification_seq, notification_type, group_id, is_filtered = false) {
       return this.execApi(
         data,
         "accept_group_request",
@@ -1605,14 +1407,7 @@ Bot.adapter.push(
       )
     }
 
-    async rejectGroupRequest(
-      data,
-      notification_seq,
-      notification_type,
-      group_id,
-      is_filtered = false,
-      reason,
-    ) {
+    async rejectGroupRequest(data, notification_seq, notification_type, group_id, is_filtered = false, reason) {
       return this.execApi(
         data,
         "reject_group_request",

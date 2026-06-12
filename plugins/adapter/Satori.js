@@ -42,11 +42,7 @@ Bot.adapter.push(
         const availableBots = Object.values(Bot.bots).filter(b => b.adapter === this)
         if (availableBots.length > 0) {
           bot = availableBots[0]
-          Bot.makeLog(
-            "warn",
-            `使用替代bot ${bot.self_id} 发送API请求，原bot ${selfId} 不存在`,
-            "Satori",
-          )
+          Bot.makeLog("warn", `使用替代bot ${bot.self_id} 发送API请求，原bot ${selfId} 不存在`, "Satori")
         }
       }
 
@@ -78,11 +74,7 @@ Bot.adapter.push(
 
         if (!response.ok) {
           const errorText = await response.text()
-          Bot.makeLog(
-            "error",
-            [`HTTP ${response.status}: ${response.statusText}`, errorText],
-            "Satori",
-          )
+          Bot.makeLog("error", [`HTTP ${response.status}: ${response.statusText}`, errorText], "Satori")
 
           if (response.status === 403) {
             if (errorText.includes("login not found")) {
@@ -225,12 +217,7 @@ Bot.adapter.push(
     }
 
     async sendFriendMsg(data, msg) {
-      Bot.makeLog(
-        "info",
-        `发送私聊消息：${this.makeLog(msg)}`,
-        `${data.self_id} => ${data.user_id}`,
-        true,
-      )
+      Bot.makeLog("info", `发送私聊消息：${this.makeLog(msg)}`, `${data.self_id} => ${data.user_id}`, true)
 
       let channelId = data.channel_id
 
@@ -245,11 +232,7 @@ Bot.adapter.push(
           )
           channelId = channel.id
         } catch (err) {
-          Bot.makeLog(
-            "error",
-            ["创建私聊频道失败，使用 user_id 作为 channel_id", err],
-            data.self_id,
-          )
+          Bot.makeLog("error", ["创建私聊频道失败，使用 user_id 作为 channel_id", err], data.self_id)
           channelId = data.user_id
         }
       }
@@ -258,22 +241,12 @@ Bot.adapter.push(
     }
 
     sendGroupMsg(data, msg) {
-      Bot.makeLog(
-        "info",
-        `发送群消息：${this.makeLog(msg)}`,
-        `${data.self_id} => ${data.group_id}`,
-        true,
-      )
+      Bot.makeLog("info", `发送群消息：${this.makeLog(msg)}`, `${data.self_id} => ${data.group_id}`, true)
       return this.sendMsg(msg, data.channel_id || data.group_id, data.self_id)
     }
 
     sendGuildMsg(data, msg) {
-      Bot.makeLog(
-        "info",
-        `发送频道消息：${this.makeLog(msg)}`,
-        `${data.self_id} => ${data.guild_id}-${data.channel_id}`,
-        true,
-      )
+      Bot.makeLog("info", `发送频道消息：${this.makeLog(msg)}`, `${data.self_id} => ${data.guild_id}-${data.channel_id}`, true)
       return this.sendMsg(msg, data.channel_id, data.self_id)
     }
 
@@ -431,22 +404,12 @@ Bot.adapter.push(
     makeMessage(data) {
       switch (data.message_type) {
         case "private":
-          Bot.makeLog(
-            "info",
-            `好友消息：[${data.sender.nickname}] ${data.raw_message}`,
-            `${data.self_id} <= ${data.user_id}`,
-            true,
-          )
+          Bot.makeLog("info", `好友消息：[${data.sender.nickname}] ${data.raw_message}`, `${data.self_id} <= ${data.user_id}`, true)
           break
         case "group":
           const group_name = data.group_name || data.bot.gl.get(data.group_id)?.group_name
           const user_name = data.sender.card || data.sender.nickname
-          Bot.makeLog(
-            "info",
-            `群消息：${group_name ? `[${group_name}, ${user_name}] ` : `[${user_name}] `}${data.raw_message}`,
-            `${data.self_id} <= ${data.group_id}, ${data.user_id}`,
-            true,
-          )
+          Bot.makeLog("info", `群消息：${group_name ? `[${group_name}, ${user_name}] ` : `[${user_name}] `}${data.raw_message}`, `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
           break
         default:
           Bot.makeLog("warn", `未知消息类型：${data.message_type}`, data.self_id)
@@ -673,9 +636,7 @@ Bot.adapter.push(
                     {
                       loginId,
                       eventType: event.type,
-                      availableBots: Object.keys(Bot.bots).filter(
-                        id => Bot.bots[id].adapter === this,
-                      ),
+                      availableBots: Object.keys(Bot.bots).filter(id => Bot.bots[id].adapter === this),
                     },
                   ],
                   "Satori",
@@ -708,11 +669,7 @@ Bot.adapter.push(
               return 0
             })
 
-            Bot.makeLog(
-              "mark",
-              `Satori WebSocket 已连接 ${loginIds.length} 个登录：${loginIds.join("、")}`,
-              "Satori",
-            )
+            Bot.makeLog("mark", `Satori WebSocket 已连接 ${loginIds.length} 个登录：${loginIds.join("、")}`, "Satori")
           }
           break
 

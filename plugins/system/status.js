@@ -26,29 +26,20 @@ export class status extends plugin {
         }),
       )
 
-    const msg =
-      `—— AIGC Yunzai v${cfg.package.version} ——\n` +
-      `运行时间：${Bot.getTimeDiff()}\n` +
-      `内存使用：${(process.memoryUsage().rss / 1024 / 1024).toFixed(2)}MB\n` +
-      `系统版本：${process.platform} ${process.arch} ${process.version}\n\n` +
-      this.botTime() +
-      (await this.count())
+    const msg = `—— AIGC Yunzai v${cfg.package.version} ——\n` + `运行时间：${Bot.getTimeDiff()}\n` + `内存使用：${(process.memoryUsage().rss / 1024 / 1024).toFixed(2)}MB\n` + `系统版本：${process.platform} ${process.arch} ${process.version}\n\n` + this.botTime() + (await this.count())
 
     return this.reply(Bot.makeForwardArray([msg, this.pluginTime()]))
   }
 
   botTime() {
     let msg = "账号在线时长"
-    for (const i of Bot.uin)
-      if (Bot[i]?.stat?.start_time)
-        msg += `\n${Bot.getTimeDiff(Bot[i].stat.start_time * 1000)} ${i}`
+    for (const i of Bot.uin) if (Bot[i]?.stat?.start_time) msg += `\n${Bot.getTimeDiff(Bot[i].stat.start_time * 1000)} ${i}`
     return msg
   }
 
   pluginTime() {
     let msg = "插件加载用时"
-    for (const i in PluginsLoader.load_time)
-      msg += `\n${Bot.getTimeDiff(0, PluginsLoader.load_time[i])} ${i}`
+    for (const i in PluginsLoader.load_time) msg += `\n${Bot.getTimeDiff(0, PluginsLoader.load_time[i])} ${i}`
     return msg
   }
 
@@ -109,11 +100,7 @@ export class status extends plugin {
     if (cmd["用户"]) array.push({ text: "用户", key: `user`, id: cmd["用户"] })
     if (cmd["群"]) array.push({ text: "群", key: `group`, id: cmd["群"] })
     if (!array.length) {
-      array.push(
-        { text: msg, key: "total" },
-        { type: "keys", text: "用户量", key: "user:*" },
-        { type: "keys", text: "群量", key: "group:*" },
-      )
+      array.push({ text: msg, key: "total" }, { type: "keys", text: "用户量", key: "user:*" }, { type: "keys", text: "群量", key: "group:*" })
       msg = ""
       if (this.e.self_id) array.push({ text: "机器人", key: `bot`, id: this.e.self_id })
       if (this.e.user_id) array.push({ text: "用户", key: `user`, id: this.e.user_id })

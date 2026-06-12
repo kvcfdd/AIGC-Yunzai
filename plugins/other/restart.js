@@ -67,9 +67,7 @@ export class Restart extends plugin {
 
     this.task = []
     if (cfg.bot.restart_cron)
-      for (const i of Array.isArray(cfg.bot.restart_cron)
-        ? cfg.bot.restart_cron
-        : [cfg.bot.restart_cron])
+      for (const i of Array.isArray(cfg.bot.restart_cron) ? cfg.bot.restart_cron : [cfg.bot.restart_cron])
         this.task.push({
           name: "定时重启",
           cron: i,

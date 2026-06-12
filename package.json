@@ -13,7 +13,7 @@
     "stop": "pm2 stop config/pm2.yaml",
     "restart": "pm2 restart config/pm2.yaml",
     "log": "pm2 log --lines 100",
-    "lint": "git ls-files '*.js'|xargs prettier --write --list-different"
+    "lint": "prettier --write \"**/*.js\""
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",

@@ -42,9 +42,7 @@ export default class Playwright extends Renderer {
       if (this.activeTaskCount < this.maxConcurrency) {
         task()
       } else {
-        logger.mark(
-          `[Playwright] 正在排队... 当前任务: ${this.activeTaskCount}, 队列: ${this.queue.length + 1}`,
-        )
+        logger.mark(`[Playwright] 正在排队... 当前任务: ${this.activeTaskCount}, 队列: ${this.queue.length + 1}`)
         this.queue.push(task)
       }
     })
@@ -110,9 +108,7 @@ export default class Playwright extends Renderer {
 
       // 设置视口尺寸
       const viewWidth = Math.max(Math.ceil(box.width), 1)
-      const viewHeight = data.multiPage
-        ? (data.pageHeight || 5000) + 100
-        : Math.max(Math.ceil(box.height), 1)
+      const viewHeight = data.multiPage ? (data.pageHeight || 5000) + 100 : Math.max(Math.ceil(box.height), 1)
 
       await page.setViewportSize({ width: viewWidth, height: viewHeight })
 
@@ -165,13 +161,9 @@ export default class Playwright extends Renderer {
       }
 
       // 统计日志
-      const sizeStr = Array.isArray(buff)
-        ? `${(buff.reduce((a, b) => a + b.length, 0) / 1024).toFixed(2)}KB (${buff.length}页)`
-        : `${(buff.length / 1024).toFixed(2)}KB`
+      const sizeStr = Array.isArray(buff) ? `${(buff.reduce((a, b) => a + b.length, 0) / 1024).toFixed(2)}KB (${buff.length}页)` : `${(buff.length / 1024).toFixed(2)}KB`
 
-      logger.mark(
-        `[图片生成][${browser.taskNum + 1}次][${name}] ${sizeStr} ${Date.now() - start}ms`,
-      )
+      logger.mark(`[图片生成][${browser.taskNum + 1}次][${name}] ${sizeStr} ${Date.now() - start}ms`)
 
       return buff
     } catch (error) {

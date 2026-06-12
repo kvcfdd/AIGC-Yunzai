@@ -102,9 +102,7 @@ export default class ServerRenderer extends Renderer {
           res.set("Content-Type", `image/${imgType}`)
           res.send(buff)
 
-          logger.mark(
-            `[ServerRenderer][${browser.taskNum + 1}次][${reqId}] 渲染成功 [${imgType.toUpperCase()}] ${Math.round(buff.length / 1024)}KB`,
-          )
+          logger.mark(`[ServerRenderer][${browser.taskNum + 1}次][${reqId}] 渲染成功 [${imgType.toUpperCase()}] ${Math.round(buff.length / 1024)}KB`)
         } catch (err) {
           logger.error(`[ServerRenderer][${reqId}] 失败`, err.message)
           res.status(500).json({ error: err.message })
