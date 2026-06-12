@@ -8,7 +8,7 @@ import log from "../../lib/aigc/helpers/log.js"
 const con = () => Bot.aigc.conversation
 const tools = () => Bot.aigc.tools
 const kb = () => Bot.aigc.knowledge
-const MAX_TOOL_ROUNDS = 6
+const MAX_TOOL_ROUNDS = 5
 
 /** AIGC 入口：被 @ 且无命令匹配时触发，支持工具调用、长期记忆、知识库检索 */
 export class AigcFallback extends plugin {
