@@ -256,9 +256,9 @@ export class AigcFallback extends plugin {
     log.info(`用户 ${this.e.user_id} 发起对话`)
 
     try {
-      await con().setSystem(key, await this._buildSystem(userMsg))
+      const systemPrompt = await this._buildSystem(userMsg)
       const images = await Bot.aigc.provider.resolveImages(this.e.img)
-      await this._replyLoop(key, userMsg, images)
+      await this._replyLoop(key, userMsg, images, systemPrompt)
     } catch (err) {
       log.error(`对话异常: ${err.message}`)
       const code = err.code ? `，错误码 ${err.code}` : ""
@@ -464,14 +464,16 @@ export class AigcFallback extends plugin {
 
   /** 工具调用循环：LLM 回复 → tool_calls 则执行并回传 → 文本则发送并退出。
    *  整轮对话在内存中累积，最终回复生成后才原子写入缓存，避免中途死机留下残缺记录。 */
-  async _replyLoop(sessionKey, userMsg, images) {
-    const baseMessages = await con().getMessages(sessionKey)
+  async _replyLoop(sessionKey, userMsg, images, systemPrompt) {
+    const rawHistory = await con().getMessages(sessionKey)
+    const baseMessages = rawHistory.filter(m => m.role !== "system")
+    const systemMsg = { role: "system", content: systemPrompt }
     const pending = []
     let userPushed = false
     const calledTools = new Set()
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const messages = [...baseMessages, ...pending]
+      const messages = [systemMsg, ...baseMessages, ...pending]
       if (!userPushed) {
         const um = { role: "user", content: userMsg }
         if (images) um.images = images
@@ -611,12 +613,12 @@ export class AigcFallback extends plugin {
       })
       userPushed = true
     }
-    const finalMessages = [...baseMessages, ...pending]
+    const finalMessages = [systemMsg, ...baseMessages, ...pending]
     const finalOpts = {}
     const finalToolDefs = tools().getDefinitions()
     if (finalToolDefs.length) {
       finalOpts.tools = finalToolDefs
-      finalOpts.tool_choice = "auto"
+      finalOpts.tool_choice = "none"
     }
     const finalReply = await Bot.aigc.provider.chat(finalMessages, finalOpts)
 
