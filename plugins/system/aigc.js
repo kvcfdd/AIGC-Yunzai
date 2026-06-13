@@ -449,6 +449,7 @@ export class AigcFallback extends plugin {
         reasoning_content: res.reasoning_content,
       }),
       ...(res.reasoning_parts && { reasoning_parts: res.reasoning_parts }),
+      ...(res.content_parts && { content_parts: res.content_parts }),
     }
   }
 
