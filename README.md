@@ -7,8 +7,8 @@
 
 - **AI 对话引擎** — 完整的 LLM + 工具调用 + MCP 外部工具协议 + PCP 插件能力协议，支持知识库，长期记忆(LLM自控,这个得随缘)等...
 - **PCP 协议** — 插件功能自动暴露为 LLM 可调用的工具，LLM 可以以此触发对应功能(需插件方适配)
-- **OneBotv11 适配器** — 针对NCQQ适配
-- **公共浏览器实例** — 迁移至playwright渲染器，增加一个给其它非云崽生态项目使用的渲染器，以及LLM工具中使用的浏览器皆为同一个实例
+- **NapCat 适配器** — 针对NCQQ适配
+- **公共浏览器实例** — 迁移至playwright渲染器，增加一个给其它非云崽生态项目使用的渲染器，以及LLM工具中使用的浏览器皆为同一个实例，以降低资源消耗
 
 ## 安装
 
@@ -31,6 +31,21 @@ node app
 ```
 
 推荐使用[锅巴插件](https://github.com/kvcfdd/guoba-plugin)配置
+
+## WebSocket
+
+<details>
+<summary>展开查看</summary>
+
+```bash
+# 原版OneBotv11
+ws://localhost:2536/OneBotv11
+
+# NapCat版
+ws://localhost:2536/NapCat
+```
+
+</details>
 
 ## AI 内置工具
 
@@ -113,7 +128,6 @@ export class MyPlugin extends plugin {
 | `this.reply()` 后不返回 | 自动返回 `"[已发送]"`（检测到 reply 调用）                     |
 | 发送图片 + 不返回       | 自动返回 `{ images: [...], text: "[已发送]" }`，LLM 可看到图片 |
 
-**PCP为随意命名，无任何歧义，且处于尝试阶段，如需使用建议自己改改尝试即可**
 
 </details>
 
