@@ -410,7 +410,8 @@ export class AigcFallback extends plugin {
       } else if (seg.type === "at") {
         parts.push(` @${this._resolveAtName(seg.qq)} `)
       } else if (seg.type === "image") {
-        parts.push("[图片]")
+        const url = seg.url || ""
+        parts.push(url ? `[图片: ${url}]` : "[图片]")
       } else if (seg.type === "file") {
         parts.push("[文件]")
       } else if (seg.type === "face") {
@@ -603,8 +604,7 @@ export class AigcFallback extends plugin {
       return
     }
 
-    // 工具轮次用尽：最后一轮工具结果已附带停止提示
-    // 再发一次带 tools 的请求 —— 听话则正常结束，头铁则拦截
+    // 工具轮次用尽：tool_choice="none" 强制文本回复
     if (!userPushed) {
       pending.push({
         role: "user",
@@ -623,21 +623,12 @@ export class AigcFallback extends plugin {
     }
     const finalReply = await Bot.aigc.provider.chat(finalMessages, finalOpts)
 
-    // 听话，纯文本回复，正常保存并发送
-    if (finalReply.content && !finalReply.tool_calls?.length) {
+    // 纯文本回复，正常保存并发送
+    if (finalReply.content) {
       pending.push(this._buildAssistantMsg(finalReply))
       await con().appendMessages(sessionKey, pending)
       log.warn(`工具轮次超限，降级回复成功`)
       return this._sendReply(finalReply.content)
-    }
-
-    // 头铁硬要调工具：直接拦截，本轮对话不缓存
-    if (finalReply.tool_calls?.length) {
-      const names = finalReply.tool_calls
-        .map(c => c.function?.name)
-        .filter(Boolean)
-        .join(",")
-      log.warn(`工具轮次超限，LLM仍试图调用工具: ${names}`)
     }
     log.error(`全部失败`)
     return this.reply("请求失败，请稍后再试", true)
