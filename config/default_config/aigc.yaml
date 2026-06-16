@@ -8,14 +8,14 @@ provider: openai
 openai:
   endpoint: https://api.openai.com # 可替换为兼容 OpenAI API 的其他服务地址
   api_key: "" # 多 Key 用英文逗号分隔，如 "sk-xxx,sk-yyy"
-  model: gpt-4o-mini # 模型，多模型用英文逗号分隔 (不建议)
+  model: gpt-4o-mini # 模型
   thinking_effort: "" # 思考等级，留空=关闭思考，按提供商要求填写
 
 # Google Gemini
 gemini:
   endpoint: https://generativelanguage.googleapis.com # 可替换为兼容 Google Gemini API 的反代地址
   api_key: "" # 多 Key 用英文逗号分隔，如 "xxx,yyy"
-  model: gemini-3.5-flash,gemini-3-flash-preview # 模型，多模型用英文逗号分隔 (不建议3系以前的模型)
+  model: gemini-3.5-flash # 模型
   thinking_level: low # 思考等级 minimal, low, medium, high
   embedding_model: gemini-embedding-2 # Embedding 模型，用于知识库向量化
 
@@ -70,7 +70,7 @@ group_history_count: 30
 show_thinking: false
 # 是否允许分句回复
 split_reply: false
-# 推理内容兼容，没出问题就勿动
+# openai推理内容兼容，没出问题就勿动
 strip_reasoning: false
 # B站 Cookie（用于视频搜索和下载，不填则使用匿名会话）
 bilibili_cookie: ""
