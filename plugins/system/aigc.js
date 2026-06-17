@@ -370,7 +370,6 @@ export class AigcFallback extends plugin {
         const sender = msg.sender || {}
         const name = sender.card || sender.nickname || "Unknown"
         const qq = sender.user_id || "?"
-        const sex = { male: "男", female: "女", unknown: "未知" }[sender.sex] || sender.sex || "未知"
         const role = { owner: "群主", admin: "群管理员", member: "群成员" }[sender.role] || sender.role || "群成员"
         let time = ""
         if (msg.time) {
@@ -382,9 +381,7 @@ export class AigcFallback extends plugin {
         const text = this._extractMsgText(msg)
         if (!text) continue
 
-        const meta = [`QQ: ${qq}`, `性别: ${sex}`, `群身份: ${role}`]
-        if (time) meta.push(`时间: ${time}`)
-        lines.push(`  - [${name}](${meta.join(", ")}): ${text}`)
+        lines.push(`  - ${time ? `[${time}] ` : ""}[${name}](QQ: ${qq}, 群身份: ${role}): ${text}`)
       }
 
       return lines.length ? lines.join("\n") : null
@@ -411,7 +408,7 @@ export class AigcFallback extends plugin {
         parts.push(` @${this._resolveAtName(seg.qq)} `)
       } else if (seg.type === "image") {
         const url = seg.url || ""
-        parts.push(url ? `[图片: ${url}]` : "[图片]")
+        parts.push(url ? `[图片](${url})` : "[图片]")
       } else if (seg.type === "file") {
         parts.push("[文件]")
       } else if (seg.type === "face") {
@@ -421,6 +418,14 @@ export class AigcFallback extends plugin {
         parts.push("[视频]")
       } else if (seg.type === "record" || seg.type === "audio") {
         parts.push("[语音]")
+      } else if (seg.type === "reply") {
+        parts.push("[引用]")
+      } else if (seg.type === "json") {
+        const data = typeof seg.data === "string" ? JSON.parse(seg.data) : seg.data || {}
+        const meta = data?.meta?.detail_1 || data?.meta?.detail || data
+        const title = meta?.title || meta?.desc || ""
+        const url = meta?.url || meta?.qqdocurl || ""
+        parts.push(title ? `[小程序: ${title}](${url})` : url ? `[分享](${url})` : "[分享]")
       }
     }
     return parts.join("").trim()
