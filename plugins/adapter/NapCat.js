@@ -228,7 +228,9 @@ Bot.adapter.push(
     // 获取陌生人信息
     async getFriendInfo(data) {
       const info = (await data.bot.sendApi("get_stranger_info", { user_id: data.user_id })).data
-      data.bot.fl.set(data.user_id, info)
+      if (data.bot.fl.has(data.user_id)) {
+        data.bot.fl.set(data.user_id, info)
+      }
       return info
     }
 
@@ -1387,9 +1389,13 @@ Bot.adapter.push(
           break
         case "friend_add":
           Bot.makeLog("info", "好友添加", `${data.self_id} <= ${data.user_id}`, true)
-          data.bot
-            .pickFriend(data.user_id)
-            .getInfo()
+          this.getFriendMap(data)
+            .then(() => {
+              data.bot
+                .pickFriend(data.user_id)
+                .getInfo()
+                .catch(() => {})
+            })
             .catch(() => {})
           break
         case "notify":

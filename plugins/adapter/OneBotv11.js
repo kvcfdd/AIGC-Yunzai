@@ -257,13 +257,14 @@ Bot.adapter.push(
       return map
     }
 
-    async getFriendInfo(data) {
+    async getFriendInfo(data, no_cache, add) {
       const info = (
         await data.bot.sendApi("get_stranger_info", {
           user_id: data.user_id,
+          no_cache,
         })
       ).data
-      data.bot.fl.set(data.user_id, info)
+      if (add || data.bot.fl.has(data.user_id)) data.bot.fl.set(data.user_id, info)
       return info
     }
 
@@ -300,13 +301,14 @@ Bot.adapter.push(
       return map
     }
 
-    async getGroupInfo(data) {
+    async getGroupInfo(data, no_cache, add) {
       const info = (
         await data.bot.sendApi("get_group_info", {
           group_id: data.group_id,
+          no_cache,
         })
       ).data
-      data.bot.gl.set(data.group_id, info)
+      if (add || data.bot.gl.has(data.group_id)) data.bot.gl.set(data.group_id, info)
       return info
     }
 
@@ -341,19 +343,20 @@ Bot.adapter.push(
       }
     }
 
-    async getMemberInfo(data) {
+    async getMemberInfo(data, no_cache, add) {
       const info = (
         await data.bot.sendApi("get_group_member_info", {
           group_id: data.group_id,
           user_id: data.user_id,
+          no_cache,
         })
       ).data
       let gml = data.bot.gml.get(data.group_id)
       if (!gml) {
         gml = new Map()
-        data.bot.gml.set(data.group_id, gml)
+        if (add || data.bot.gl.has(data.group_id)) data.bot.gml.set(data.group_id, gml)
       }
-      gml.set(data.user_id, info)
+      if (add || data.bot.gml.has(data.user_id)) gml.set(data.user_id, info)
       return info
     }
 
@@ -965,9 +968,9 @@ Bot.adapter.push(
         case "group_increase": {
           Bot.makeLog("info", `群成员增加：${data.operator_id} => ${data.user_id} ${data.sub_type}`, `${data.self_id} <= ${data.group_id}`, true)
           const group = data.bot.pickGroup(data.group_id)
-          group.getInfo()
+          group.getInfo(true, true)
           if (data.user_id === data.self_id && cfg.bot.cache_group_member) group.getMemberMap()
-          else group.pickMember(data.user_id).getInfo()
+          else group.pickMember(data.user_id).getInfo(true, true)
           break
         }
         case "group_decrease": {
@@ -976,7 +979,7 @@ Bot.adapter.push(
             data.bot.gl.delete(data.group_id)
             data.bot.gml.delete(data.group_id)
           } else {
-            data.bot.pickGroup(data.group_id).getInfo()
+            data.bot.pickGroup(data.group_id).getInfo(true, true)
             data.bot.gml.get(data.group_id)?.delete(data.user_id)
           }
           break
@@ -984,7 +987,7 @@ Bot.adapter.push(
         case "group_admin":
           Bot.makeLog("info", `群管理员变动：${data.sub_type}`, `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
           data.set = data.sub_type === "set"
-          data.bot.pickMember(data.group_id, data.user_id).getInfo()
+          data.bot.pickMember(data.group_id, data.user_id).getInfo(true, true)
           break
         case "group_upload":
           Bot.makeLog("info", `群文件上传：${Bot.String(data.file)}`, `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
@@ -999,14 +1002,14 @@ Bot.adapter.push(
           break
         case "group_ban":
           Bot.makeLog("info", `群禁言：${data.operator_id} => ${data.user_id} ${data.sub_type} ${data.duration}秒`, `${data.self_id} <= ${data.group_id}`, true)
-          if (data.user_id !== 0) data.bot.pickMember(data.group_id, data.user_id).getInfo()
+          if (data.user_id !== 0) data.bot.pickMember(data.group_id, data.user_id).getInfo(true, true)
           break
         case "group_msg_emoji_like":
           Bot.makeLog("info", [`群消息回应：${data.message_id}`, data.likes], `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
           break
         case "friend_add":
           Bot.makeLog("info", "好友添加", `${data.self_id} <= ${data.user_id}`, true)
-          data.bot.pickFriend(data.user_id).getInfo()
+          data.bot.pickFriend(data.user_id).getInfo(true, true)
           break
         case "notify":
           if (data.group_id) data.notice_type = "group"
@@ -1025,15 +1028,15 @@ Bot.adapter.push(
               break
             case "honor":
               Bot.makeLog("info", `群荣誉：${data.honor_type}`, `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
-              data.bot.pickMember(data.group_id, data.user_id).getInfo()
+              data.bot.pickMember(data.group_id, data.user_id).getInfo(true, true)
               break
             case "title":
               Bot.makeLog("info", `群头衔：${data.title}`, `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
-              data.bot.pickMember(data.group_id, data.user_id).getInfo()
+              data.bot.pickMember(data.group_id, data.user_id).getInfo(true, true)
               break
             case "group_name":
               Bot.makeLog("info", `群名更改：${data.name_new}`, `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
-              data.bot.pickGroup(data.group_id).getInfo()
+              data.bot.pickGroup(data.group_id).getInfo(true, true)
               break
             case "input_status":
               data.post_type = "internal"
@@ -1051,7 +1054,7 @@ Bot.adapter.push(
           break
         case "group_card":
           Bot.makeLog("info", `群名片更新：${data.card_old} => ${data.card_new}`, `${data.self_id} <= ${data.group_id}, ${data.user_id}`, true)
-          data.bot.pickMember(data.group_id, data.user_id).getInfo()
+          data.bot.pickMember(data.group_id, data.user_id).getInfo(true, true)
           break
         case "offline_file":
           Bot.makeLog("info", `离线文件：${Bot.String(data.file)}`, `${data.self_id} <= ${data.user_id}`, true)
