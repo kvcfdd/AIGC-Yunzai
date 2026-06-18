@@ -15,12 +15,12 @@ openai:
 gemini:
   endpoint: https://generativelanguage.googleapis.com # 可替换为兼容 Google Gemini API 的反代地址
   api_key: "" # 多 Key 用英文逗号分隔，如 "xxx,yyy"
-  model: gemini-3.5-flash # 模型
-  thinking_level: low # 思考等级 minimal, low, medium, high
+  model: gemini-3.5-flash # 模型(白嫖党相对推荐Gemma系列,整体效果优于gemini系列...就是有点慢)
+  thinking_level: minimal # 思考等级 minimal, low, medium, high
   embedding_model: gemini-embedding-2 # Embedding 模型，用于知识库向量化
 
 # 输出最大长度
-max_tokens: 2048
+max_tokens: 4096
 # 输出随机程度 (0-1，值越大输出越随机)
 temperature: 1
 # 机器人名称(AIGC相关日志显示)
