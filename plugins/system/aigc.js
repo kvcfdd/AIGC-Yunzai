@@ -41,7 +41,7 @@ export class AigcFallback extends plugin {
     const parts = []
     let last = 0
     // @mention: 前面有无空格均可，后面必须空格或结尾；face: [中文/A-Z]
-    const re = /(\s?)@([\p{Script=Han}\w]+)(?=\s|$)|\[([\p{Script=Han}A-Z]+)\]/gu
+    const re = /(\s?)@([\p{Script=Han}\w]+)(?=\s|$)|\[([\p{Script=Han}\w]+)\]/gu
     let m
     while ((m = re.exec(text)) !== null) {
       if (m.index > last) parts.push({ type: "text", data: { text: text.slice(last, m.index) } })
@@ -186,10 +186,23 @@ export class AigcFallback extends plugin {
     if (qq === "all") return "全体成员"
     try {
       if (this.e?.isGroup) {
-        const m = Bot.pickMember(this.e.group_id, qq)
-        return m.card || m.nickname || String(qq)
+        const gid = this.e.group_id
+        const ml = Bot.gml?.get(Number(gid)) || Bot.gml?.get(String(gid))
+        if (ml) {
+          const info = ml.get(Number(qq)) || ml.get(String(qq))
+          if (info) {
+            return info.card || info.nickname || String(qq)
+          }
+        }
+
+        const m = Bot.pickMember(gid, qq)
+        if (m) {
+          return m.card || m.nickname || String(qq)
+        }
       }
-    } catch {}
+    } catch (err) {
+      // 避免解析异常导致流程中断
+    }
     return String(qq)
   }
 
@@ -204,9 +217,7 @@ export class AigcFallback extends plugin {
         parts.push(seg.text || "")
       } else if (seg.type === "at") {
         if (seg.qq == this.e.self_id) continue
-        parts.push(` @${this._resolveAtName(seg.qq)} `)
-      } else if (seg.type === "file") {
-        parts.push("[文件]")
+        parts.push(`@${this._resolveAtName(seg.qq)}`)
       } else if (seg.type === "face") {
         const name = faceName(seg.id)
         parts.push(name ? `[${name}]` : "[表情]")
@@ -405,7 +416,7 @@ export class AigcFallback extends plugin {
       if (seg.type === "text") {
         parts.push(seg.text || "")
       } else if (seg.type === "at") {
-        parts.push(` @${this._resolveAtName(seg.qq)} `)
+        parts.push(`@${this._resolveAtName(seg.qq)}`)
       } else if (seg.type === "image") {
         const url = seg.url || ""
         parts.push(url ? `[图片](${url})` : "[图片]")

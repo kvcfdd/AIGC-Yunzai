@@ -143,8 +143,12 @@ Bot.adapter.push(
       const msgs = (
         await data.bot.sendApi("get_friend_msg_history", {
           user_id: data.user_id,
-          message_seq,
+          message_seq: String(message_seq ?? 0),
           count,
+          reverse_order: reverseOrder,
+          disable_get_url: false,
+          parse_mult_msg: true,
+          quick_reply: false,
           reverseOrder,
         })
       ).data?.messages
@@ -157,8 +161,12 @@ Bot.adapter.push(
       const msgs = (
         await data.bot.sendApi("get_group_msg_history", {
           group_id: data.group_id,
-          message_seq,
+          message_seq: String(message_seq ?? 0),
           count,
+          reverse_order: reverseOrder,
+          disable_get_url: false,
+          parse_mult_msg: true,
+          quick_reply: false,
           reverseOrder,
         })
       ).data?.messages
@@ -197,18 +205,22 @@ Bot.adapter.push(
     // 发送私聊合并转发消息
     async sendFriendForwardMsg(data, msg) {
       Bot.makeLog("info", `发送好友转发消息：${this.makeLog(msg)}`, `${data.self_id} => ${data.user_id}`, true)
+      const messages = await this.makeForwardMsg(msg, data)
       return data.bot.sendApi("send_private_forward_msg", {
         user_id: data.user_id,
-        messages: await this.makeForwardMsg(msg, data),
+        message: messages,
+        messages,
       })
     }
 
     // 发送群合并转发消息
     async sendGroupForwardMsg(data, msg) {
       Bot.makeLog("info", `发送群转发消息：${this.makeLog(msg)}`, `${data.self_id} => ${data.group_id}`, true)
+      const messages = await this.makeForwardMsg(msg, data)
       return data.bot.sendApi("send_group_forward_msg", {
         group_id: data.group_id,
-        messages: await this.makeForwardMsg(msg, data),
+        message: messages,
+        messages,
       })
     }
 
@@ -226,8 +238,8 @@ Bot.adapter.push(
       return map
     }
     // 获取陌生人信息
-    async getFriendInfo(data) {
-      const info = (await data.bot.sendApi("get_stranger_info", { user_id: data.user_id })).data
+    async getFriendInfo(data, no_cache = false) {
+      const info = (await data.bot.sendApi("get_stranger_info", { user_id: data.user_id, no_cache })).data
       if (data.bot.fl.has(data.user_id)) {
         data.bot.fl.set(data.user_id, info)
       }
@@ -422,7 +434,7 @@ Bot.adapter.push(
     // 创建群文件目录
     createGroupFileFolder(data, name) {
       Bot.makeLog("info", `创建群文件夹：${name}`, `${data.self_id} => ${data.group_id}`, true)
-      return data.bot.sendApi("create_group_file_folder", { group_id: data.group_id, name })
+      return data.bot.sendApi("create_group_file_folder", { group_id: data.group_id, folder_name: name, name })
     }
 
     // 获取群文件系统信息
@@ -495,7 +507,7 @@ Bot.adapter.push(
       return data.bot.sendApi("delete_essence_msg", { message_id })
     }
 
-    // 发送群戳一戳
+    // 发送戳一戳
     sendPoke(data, group_id, user_id) {
       const target_id = user_id ?? data.user_id
       Bot.makeLog("info", `发送戳一戳：${target_id}`, group_id ? `${data.self_id} => ${group_id}` : `${data.self_id} => ${target_id}`, true)
@@ -544,20 +556,6 @@ Bot.adapter.push(
       return data.bot.sendApi("get_recent_contact", { count })
     }
 
-    // 获取AI角色列表
-    getAiCharacters(data, group_id, chat_type) {
-      return data.bot.sendApi("get_ai_characters", { group_id, chat_type })
-    }
-    // 发送群AI语音
-    sendGroupAiRecord(data, group_id, character, text) {
-      return data.bot.sendApi("send_group_ai_record", { group_id, character, text })
-    }
-
-    // 点击内联键盘按钮
-    clickInlineKeyboardButton(data, params) {
-      return data.bot.sendApi("click_inline_keyboard_button", params)
-    }
-
     // 获取群@全体剩余次数
     getGroupAtAllRemain(data) {
       return data.bot.sendApi("get_group_at_all_remain", { group_id: data.group_id })
@@ -590,7 +588,7 @@ Bot.adapter.push(
 
     // 获取群忽略通知列表
     getGroupIgnoredNotifies(data) {
-      return data.bot.sendApi("get_group_ignored_notifies", { group_id: data.group_id })
+      return data.bot.sendApi("get_group_ignored_notifies", {})
     }
 
     // 标记所有消息已读
@@ -650,11 +648,6 @@ Bot.adapter.push(
       return data.bot.sendApi("get_status", {})
     }
 
-    // 获取单向好友列表
-    getUnidirectionalFriendList(data) {
-      return data.bot.sendApi("get_unidirectional_friend_list", {})
-    }
-
     // 获取带分组的好友列表
     getFriendsWithCategory(data) {
       return data.bot.sendApi("get_friends_with_category", {})
@@ -691,8 +684,8 @@ Bot.adapter.push(
     }
 
     // 获取扩展RKey
-    getRkey(data, domain) {
-      return data.bot.sendApi("get_rkey", { domain })
+    getRkey(data) {
+      return data.bot.sendApi("get_rkey", {})
     }
 
     // 获取RKey
@@ -715,21 +708,6 @@ Bot.adapter.push(
       return data.bot.sendApi("get_robot_uin_range", {})
     }
 
-    // 获取Packet状态
-    ncGetPacketStatus(data) {
-      return data.bot.sendApi("nc_get_packet_status", {})
-    }
-
-    // 获取用户在线状态
-    ncGetUserStatus(data, user_id) {
-      return data.bot.sendApi("nc_get_user_status", { user_id })
-    }
-
-    // 发送原始数据包
-    sendPacket(data, cmd, data_hex, rsp = true) {
-      return data.bot.sendApi("send_packet", { cmd, data: data_hex, rsp })
-    }
-
     // 删除群文件目录
     deleteGroupFolder(data, folder_id) {
       return data.bot.sendApi("delete_group_folder", { group_id: data.group_id, folder_id })
@@ -742,7 +720,7 @@ Bot.adapter.push(
 
     // 获取收藏列表
     getCollectionList(data, params) {
-      return data.bot.sendApi("get_collection_list", params || {})
+      return data.bot.sendApi("get_collection_list", { category: "0", count: "50", ...params })
     }
 
     // 获取群详细信息
@@ -813,16 +791,6 @@ Bot.adapter.push(
       return data.bot.sendApi("trans_group_file", { group_id: data.group_id, ...params })
     }
 
-    // 获取频道列表
-    getGuildList(data) {
-      return data.bot.sendApi("get_guild_list", {})
-    }
-
-    // 获取频道服务资料
-    getGuildServiceProfile(data) {
-      return data.bot.sendApi("get_guild_service_profile", {})
-    }
-
     // 获取表情回应详情
     fetchEmojiLike(data, params) {
       return data.bot.sendApi("fetch_emoji_like", params)
@@ -845,7 +813,7 @@ Bot.adapter.push(
 
     // 发送私聊 ARK 分享
     sendArkShare(data, params) {
-      return data.bot.sendApi("send_ark_share", { user_id: data.user_id, ...params })
+      return data.bot.sendApi("send_ark_share", { user_id: data.user_id, phone_number: "", ...params })
     }
 
     // 设置群机器人加群选项
@@ -880,7 +848,7 @@ Bot.adapter.push(
 
     // 获取被忽略的加群请求
     getGroupIgnoreAddRequest(data) {
-      return data.bot.sendApi("get_group_ignore_add_request", { group_id: data.group_id })
+      return data.bot.sendApi("get_group_ignore_add_request", {})
     }
 
     // 清理缓存
@@ -916,6 +884,57 @@ Bot.adapter.push(
     // 设置自定义表情描述
     setCustomFaceDesc(data, params) {
       return data.bot.sendApi("set_custom_face_desc", params)
+    }
+
+    // 获取群相册列表
+    getQunAlbumList(data, attach_info = "") {
+      return data.bot.sendApi("get_qun_album_list", { group_id: data.group_id, attach_info })
+    }
+
+    // 获取群相册媒体列表
+    getGroupAlbumMediaList(data, album_id, attach_info = "") {
+      return data.bot.sendApi("get_group_album_media_list", { group_id: data.group_id, album_id, attach_info })
+    }
+
+    // 上传图片到群相册
+    async uploadImageToQunAlbum(data, album_id, album_name, file) {
+      return data.bot.sendApi("upload_image_to_qun_album", {
+        group_id: data.group_id,
+        album_id,
+        album_name,
+        file: await this.makeFile(file),
+      })
+    }
+
+    // 删除群相册媒体
+    delGroupAlbumMedia(data, album_id, lloc) {
+      return data.bot.sendApi("del_group_album_media", { group_id: data.group_id, album_id, lloc })
+    }
+
+    // 点赞群相册媒体
+    setGroupAlbumMediaLike(data, album_id, batch_id, lloc) {
+      return data.bot.sendApi("set_group_album_media_like", { group_id: data.group_id, album_id, batch_id, lloc })
+    }
+
+    // 取消点赞群相册媒体
+    cancelGroupAlbumMediaLike(data, album_id, batch_id, lloc) {
+      return data.bot.sendApi("cancel_group_album_media_like", { group_id: data.group_id, album_id, batch_id, lloc })
+    }
+
+    // 发表群相册评论
+    doGroupAlbumComment(data, album_id, lloc, content) {
+      return data.bot.sendApi("do_group_album_comment", { group_id: data.group_id, album_id, lloc, content })
+    }
+
+    // 英文单词翻译
+    translateEn2Zh(data, words) {
+      if (!Array.isArray(words)) words = [words]
+      return data.bot.sendApi("translate_en2zh", { words })
+    }
+
+    // 标记消息已读 (Go-CQHTTP 通用兼容)
+    markMsgAsRead(data, params) {
+      return data.bot.sendApi("mark_msg_as_read", params)
     }
 
     pickFriend(data, user_id) {
@@ -1030,6 +1049,15 @@ Bot.adapter.push(
         getIgnoreAddRequest: this.getGroupIgnoreAddRequest.bind(this, i),
         sendArkShare: params => this.sendGroupArkShare(i, params),
         fs: this.getGroupFs(i),
+
+        getQunAlbumList: this.getQunAlbumList.bind(this, i),
+        getGroupAlbumMediaList: this.getGroupAlbumMediaList.bind(this, i),
+        uploadImageToQunAlbum: this.uploadImageToQunAlbum.bind(this, i),
+        delGroupAlbumMedia: this.delGroupAlbumMedia.bind(this, i),
+        setGroupAlbumMediaLike: this.setGroupAlbumMediaLike.bind(this, i),
+        cancelGroupAlbumMediaLike: this.cancelGroupAlbumMediaLike.bind(this, i),
+        doGroupAlbumComment: this.doGroupAlbumComment.bind(this, i),
+
         get is_owner() {
           return data.bot.gml.get(group_id)?.get(data.self_id)?.role === "owner"
         },
@@ -1066,7 +1094,7 @@ Bot.adapter.push(
             return this.stat.packet_sent
           },
         },
-        model: "AIGC Yunzai NapCat",
+        model: "Yunzai",
 
         info: {},
         get uin() {
@@ -1134,7 +1162,6 @@ Bot.adapter.push(
         downloadFile: (url, thread_count, headers) => this.downloadFile(data, url, thread_count, headers),
         getStatus: this.getStatus.bind(this, data),
 
-        getUnidirectionalFriendList: this.getUnidirectionalFriendList.bind(this, data),
         getFriendsWithCategory: this.getFriendsWithCategory.bind(this, data),
         checkUrlSafely: url => this.checkUrlSafely(data, url),
         ocrImage: image => this.ocrImage(data, image),
@@ -1142,28 +1169,17 @@ Bot.adapter.push(
         forwardFriendSingleMsg: (user_id, message_id) => this.forwardFriendSingleMsg(data, user_id, message_id),
         forwardGroupSingleMsg: (group_id, message_id) => this.forwardGroupSingleMsg(data, group_id, message_id),
 
-        getAiCharacters: (group_id, chat_type) => this.getAiCharacters(data, group_id, chat_type),
-        sendGroupAiRecord: (group_id, character, text) => this.sendGroupAiRecord(data, group_id, character, text),
-        clickInlineKeyboardButton: params => this.clickInlineKeyboardButton(data, params),
-
-        getRkey: domain => this.getRkey(data, domain),
+        getRkey: () => this.getRkey(data),
         ncGetRkey: this.ncGetRkey.bind(this, data),
         getClientkey: this.getClientkey.bind(this, data),
         getCredentials: domain => this.getCredentials(data, domain),
         getRobotUinRange: this.getRobotUinRange.bind(this, data),
-        ncGetPacketStatus: this.ncGetPacketStatus.bind(this, data),
-        ncGetUserStatus: user_id => this.ncGetUserStatus(data, user_id),
-        sendPacket: (cmd, data_hex, rsp) => this.sendPacket(data, cmd, data_hex, rsp),
-
         createCollection: params => this.createCollection(data, params),
         getCollectionList: params => this.getCollectionList(data, params),
 
         getModelShow: this.getModelShow.bind(this, data),
         setInputStatus: params => this.setInputStatus(data, params),
         getRkeyServer: this.getRkeyServer.bind(this, data),
-
-        getGuildList: this.getGuildList.bind(this, data),
-        getGuildServiceProfile: this.getGuildServiceProfile.bind(this, data),
 
         fetchEmojiLike: params => this.fetchEmojiLike(data, params),
         getEmojiLikes: params => this.getEmojiLikes(data, params),
@@ -1183,6 +1199,9 @@ Bot.adapter.push(
         addCustomFace: params => this.addCustomFace(data, params),
         deleteCustomFace: params => this.deleteCustomFace(data, params),
         setCustomFaceDesc: params => this.setCustomFaceDesc(data, params),
+
+        translateEn2Zh: words => this.translateEn2Zh(data, words),
+        markMsgAsRead: params => this.markMsgAsRead(data, params),
 
         cookies: {},
         getCookies: domain => this.getCookies(data, domain),

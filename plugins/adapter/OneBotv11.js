@@ -829,7 +829,7 @@ Bot.adapter.push(
             return this.stat.packet_sent
           },
         },
-        model: "TRSS Yunzai ",
+        model: "Yunzai",
 
         info: {},
         get uin() {
