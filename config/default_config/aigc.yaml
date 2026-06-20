@@ -84,8 +84,8 @@ max_history: 30
 # 主动插话模式：每个群随机冷却时间，冷却期间不会触发，触发也不一定回，LLM自己决定要不要回
 ambient:
   enable: false # 是否启用
-  cooldown_min: 30 # 最小冷却
-  cooldown_max: 60 # 最大冷却
+  cooldown_min: 30 # 最小冷却，单位分钟
+  cooldown_max: 60 # 最大冷却，单位分钟
   provider: "gemini" # 分流 provider: 留空走全局, openai | gemini
   model: "gemma-4-31b-it" # 分流模型，留空走全局，
 

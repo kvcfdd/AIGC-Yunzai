@@ -232,15 +232,11 @@ export class AigcFallback extends plugin {
     const cooldown = cooldownMin + Math.floor(Math.random() * (cooldownMax - cooldownMin + 1))
 
     const userMsg = this._getUserMsg()
-    if (!userMsg) {
-      await redis.set(cooldownKey, "1", { EX: cooldown })
-      return false
-    }
+    if (!userMsg) return false
 
     // 前缀过滤
     const prefixFilter = cfg.aigc?.prefix_filter
     if (prefixFilter?.length && prefixFilter.some(p => userMsg.startsWith(p))) {
-      await redis.set(cooldownKey, "1", { EX: cooldown })
       return false
     }
 
@@ -249,7 +245,7 @@ export class AigcFallback extends plugin {
 
     try {
       const systemPrompt = this._buildAmbientPrompt()
-      const supplement = this._buildSupplement()
+      const supplement = this._buildSupplement(true)
       const envCtx = await this._buildEnvContext()
       const fullSystem = [systemPrompt, supplement, envCtx].filter(Boolean).join("\n")
 
@@ -264,7 +260,7 @@ export class AigcFallback extends plugin {
       const res = await Bot.aigc.provider.chat(messages, opts)
       const text = (res.content || "").trim()
 
-      if (!text || /^OFF\b/i.test(text)) {
+      if (!text || /^OFF$/i.test(text)) {
         log.info(`群 ${gid} 主动插话: 跳过`)
         return false
       }
@@ -410,7 +406,7 @@ export class AigcFallback extends plugin {
   }
 
   /** 系统补充信息 */
-  _buildSupplement() {
+  _buildSupplement(ambient = false) {
     const e = this.e
     const lines = []
 
@@ -420,10 +416,12 @@ export class AigcFallback extends plugin {
     if (cfg.aigc?.split_reply) {
       lines.push("- 一句话讲不完就<x>拆成多条发,模仿人类打一句话发一句话的习惯,最多允许一次拆3条。注意不要为了拆而拆,而是按实际情况来决定要不要拆！例如: 好的呀<x>那就给你瞧瞧我的本事吧！")
     }
+    if (!ambient) {
+      lines.push("- 如果判断出用户的意图不是与你对话,比如误艾特,或者艾特了你但发言意图不是找你,又或者你认为不用回复或不想回复,则只需输出 OFF 即可,不要做任何其他输出。")
+    }
     if (e.isGroup) {
       lines.push("- 群聊最近消息仅作为上下文提供给你,帮助你更好地理解当前对话环境,但你的回答不应受其影响。")
     }
-
     return `<system_supplement>\n${lines.join("\n")}\n</system_supplement>`
   }
 
@@ -697,6 +695,13 @@ export class AigcFallback extends plugin {
       }
 
       if (res.content) {
+        const text = (res.content || "").trim()
+        if (!text || /^OFF$/i.test(text)) {
+          if (!userPushed) return false
+          await con().appendMessages(sessionKey, pending)
+          return false
+        }
+
         if (!userPushed) {
           pending.push({
             role: "user",
