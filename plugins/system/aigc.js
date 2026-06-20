@@ -8,7 +8,9 @@ import log from "../../lib/aigc/helpers/log.js"
 const con = () => Bot.aigc.conversation
 const tools = () => Bot.aigc.tools
 const kb = () => Bot.aigc.knowledge
-const MAX_TOOL_ROUNDS = 5
+const getMaxToolRounds = () => Math.min(Math.max(cfg.aigc?.max_tool_rounds ?? 5, 2), 10)
+
+const AMBIENT_KEY_PREFIX = "aigc:ambient:cooldown"
 
 /** AIGC 入口：被 @ 且无命令匹配时触发，支持工具调用、长期记忆、知识库检索 */
 export class AigcFallback extends plugin {
@@ -78,13 +80,13 @@ export class AigcFallback extends plugin {
   }
 
   /** 按 <x> 分隔符拆分为多条消息依次发送 */
-  async _splitReply(text) {
+  async _splitReply(text, quote = true) {
     const parts = text.split(/<x>/)
-    if (parts.length <= 1) return this.reply(text, true)
+    if (parts.length <= 1) return this.reply(text, quote)
     for (let i = 0; i < parts.length; i++) {
       const t = parts[i].trim()
       if (!t) continue
-      await this.reply(t, i === 0)
+      await this.reply(t, i === 0 && quote)
       if (i < parts.length - 1) await new Promise(r => setTimeout(r, Math.random() * 1000 + 1000))
     }
   }
@@ -179,6 +181,102 @@ export class AigcFallback extends plugin {
     return this.reply("已清除全部知识库内容", true)
   }
 
+  /** 主动插话决策 prompt —— 仅负责判断要不要开口，不干预说话方式 */
+  _buildAmbientPrompt() {
+    const systemPrompt = cfg.aigc?.system_prompt || "你的名字叫云崽，一个智能助手。"
+    const lines = [
+      `## System Prompt`,
+      `${systemPrompt}`,
+      ``,
+      `你在群里看大家聊天。不说话是常态，大多数人 80% 的时间在划水。`,
+      ``,
+      `## 不该说话`,
+      `- 话题跟你无关、插不上嘴`,
+      `- 闲聊开玩笑、你没实质性内容`,
+      `- 只是表情、问候、附和`,
+      `- 没看懂、听不懂 → 别硬接，沉默`,
+      `- 对方故意激怒你、给你下套 → 别上套，沉默`,
+      `- 已经有人接了、话题在收尾`,
+      `- 单纯不想回、不感兴趣`,
+      ``,
+      `## 可以说话`,
+      `- 讨论你擅长的，有内容可补充`,
+      `- 有人提问你能答`,
+      `- 有人提到你`,
+      `- 群里氛围你能自然融入，群友聊什么语气你就用什么语气，别端着`,
+      ``,
+      `## 规则`,
+      `- 不说话 → 只回复 OFF（三个字母，别无其他）`,
+      `- 说话 → 直接回复，简短口语化，不超过 40 字`,
+    ]
+    return lines.join("\n")
+  }
+
+  /** 主动插话：非 @ 触发，LLM 自主决定是否参与群聊。
+   *  不走对话缓存、不带工具，回复不污染 conversation。 */
+  async _ambientTry() {
+    const gid = String(this.e.group_id)
+    const cooldownKey = `${AMBIENT_KEY_PREFIX}:${gid}`
+
+    // Redis 冷却检查
+    const existing = await redis.get(cooldownKey)
+    if (existing) {
+      const remain = await redis.ttl(cooldownKey)
+      log.debug(`群 ${gid} 主动插话冷却中 (${remain}s)`)
+      return false
+    }
+
+    const ambient = cfg.aigc?.ambient || {}
+    const cooldownMin = (ambient.cooldown_min ?? 10) * 60
+    const cooldownMax = (ambient.cooldown_max ?? 20) * 60
+    const cooldown = cooldownMin + Math.floor(Math.random() * (cooldownMax - cooldownMin + 1))
+
+    const userMsg = this._getUserMsg()
+    if (!userMsg) {
+      await redis.set(cooldownKey, "1", { EX: cooldown })
+      return false
+    }
+
+    // 前缀过滤
+    const prefixFilter = cfg.aigc?.prefix_filter
+    if (prefixFilter?.length && prefixFilter.some(p => userMsg.startsWith(p))) {
+      await redis.set(cooldownKey, "1", { EX: cooldown })
+      return false
+    }
+
+    await redis.set(cooldownKey, "1", { EX: cooldown })
+    log.info(`群 ${gid} 主动插话判断中...`)
+
+    try {
+      const systemPrompt = this._buildAmbientPrompt()
+      const supplement = this._buildSupplement()
+      const envCtx = await this._buildEnvContext()
+      const fullSystem = [systemPrompt, supplement, envCtx].filter(Boolean).join("\n")
+
+      const messages = [
+        { role: "system", content: fullSystem },
+        { role: "user", content: userMsg },
+      ]
+
+      const opts = {}
+      if (ambient.provider) opts.provider = ambient.provider
+      if (ambient.model) opts.model = ambient.model
+      const res = await Bot.aigc.provider.chat(messages, opts)
+      const text = (res.content || "").trim()
+
+      if (!text || /^OFF\b/i.test(text)) {
+        log.info(`群 ${gid} 主动插话: 跳过`)
+        return false
+      }
+
+      log.info(`群 ${gid} 主动插话: 回复`)
+      return this._sendReply(text, false)
+    } catch (err) {
+      log.warn(`群 ${gid} 主动插话异常: ${err.message}`)
+      return false
+    }
+  }
+
   // AIGC 对话主流程
 
   /** at 目标 → 显示名: 全体成员 / 群名片 / QQ号 */
@@ -241,12 +339,16 @@ export class AigcFallback extends plugin {
     }
 
     if (this.e.isGroup) {
-      if (!this.e.atBot) return false
-
       const whitelist = cfg.aigc?.group_whitelist
       if (whitelist?.length) {
         const gid = String(this.e.group_id)
         if (!whitelist.some(g => String(g) === gid)) return false
+      }
+
+      if (!this.e.atBot) {
+        const ambient = cfg.aigc?.ambient
+        if (ambient?.enable) return this._ambientTry()
+        return false
       }
     }
 
@@ -314,7 +416,6 @@ export class AigcFallback extends plugin {
 
     const timeStr = formatDate(new Date(), "full")
     lines.push(`- 现在是${timeStr}，回复内容请注意时效性。`)
-    lines.push(`- 你可以最多连续调用${MAX_TOOL_ROUNDS}轮工具,严禁超过限制的工具调用行为！`)
 
     if (cfg.aigc?.split_reply) {
       lines.push("- 一句话讲不完就<x>拆成多条发,模仿人类打一句话发一句话的习惯,最多允许一次拆3条。注意不要为了拆而拆,而是按实际情况来决定要不要拆！例如: 好的呀<x>那就给你瞧瞧我的本事吧！")
@@ -443,7 +544,7 @@ export class AigcFallback extends plugin {
   }
 
   /** 发送回复：检查语音标识 → 若开启则转语音，否则纯文本 */
-  async _sendReply(text) {
+  async _sendReply(text, quote = true) {
     try {
       const emo_switch = await Bot.aigc.voice.consume(this.e.user_id)
       if (emo_switch) {
@@ -453,7 +554,7 @@ export class AigcFallback extends plugin {
     } catch (err) {
       log.error(`语音转换失败，降级为文本: ${err.message}`)
     }
-    return this._splitReply(text)
+    return this._splitReply(text, quote)
   }
 
   /** 从 provider 响应构建待持久化的 assistant 消息 */
@@ -490,7 +591,8 @@ export class AigcFallback extends plugin {
     let userPushed = false
     const calledTools = new Set()
 
-    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const maxRounds = getMaxToolRounds()
+    for (let round = 0; round < maxRounds; round++) {
       const messages = [systemMsg, ...baseMessages, ...pending]
       if (!userPushed) {
         const um = { role: "user", content: userMsg }
@@ -569,7 +671,7 @@ export class AigcFallback extends plugin {
             }
           }),
         )
-        const lastRound = round === MAX_TOOL_ROUNDS - 1
+        const lastRound = round === maxRounds - 1
         for (let i = 0; i < results.length; i++) {
           const r = results[i]
           const callId = res.tool_calls[i]?.id || `call_${i}`
@@ -582,7 +684,7 @@ export class AigcFallback extends plugin {
             content = typeof payload === "string" ? payload : JSON.stringify(payload ?? "")
           }
           if (lastRound && i === results.length - 1) {
-            content += `\n\n[系统提示] 你已达到最大工具调用轮次 (${MAX_TOOL_ROUNDS}轮)。请立即基于已获取的所有信息回复用户，不要再调用任何工具！！！如果信息不足，如实说明已掌握的情况即可。`
+            content += `\n\n[系统提示] 你已达到最大工具调用轮次 (${maxRounds}轮)。请立即基于已获取的所有信息回复用户，不要再调用任何工具！！！如果信息不足，如实说明已掌握的情况即可。`
           }
           pending.push({
             role: "tool",
