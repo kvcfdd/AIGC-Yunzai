@@ -41,13 +41,15 @@ mcp:
   #     url: http://localhost:3000/mcp
   #     api_key: ""
   #     timeout_ms: 30000
+  #     protocol_version: "2025-11-25"  # 可选，默认 2025-11-25
   # stdio 传输:
   #   - name: my-local-tools
   #     transport: stdio
   #     command: npx
-  #     args: ["-y", "@anthropic/mcp-server-filesystem", "/allowed/dir"]
+  #     args: ["-y", "@modelcontextprotocol/server-filesystem", "/allowed/dir"]
   #     env: {}
   #     timeout_ms: 30000
+  #     protocol_version: "2025-11-25"  # 可选，默认 2025-11-25
 
 # 本地代理
 proxy:
