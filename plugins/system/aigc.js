@@ -370,8 +370,10 @@ export class AigcFallback extends plugin {
       await this._replyLoop(key, userMsg, images, systemPrompt)
     } catch (err) {
       log.error(`对话异常: ${err.message}`)
-      const code = err.code ? `，错误码 ${err.code}` : ""
-      await this.reply(`请求失败${code}，请稍后重试`, true)
+      // const code = err.code ? `，错误码 ${err.code}` : ""
+      // await this.reply(`请求失败${code}，请稍后重试`, true)
+      const retryMsg = ["唔…脑袋突然短路了，等一下再说吧~", "信号好像断掉了，稍等片刻再找我？", "哎呀，网络好像在抽风，一会儿再试试？", "脑子卡住了…先歇几秒再聊！"][Math.floor(Math.random() * 4)]
+      await this.reply(retryMsg, true)
     } finally {
       await redis.del(lockKey)
     }
@@ -587,7 +589,6 @@ export class AigcFallback extends plugin {
     const systemMsg = { role: "system", content: systemPrompt }
     const pending = []
     let userPushed = false
-    const calledTools = new Set()
 
     const maxRounds = getMaxToolRounds()
     for (let round = 0; round < maxRounds; round++) {
@@ -649,17 +650,6 @@ export class AigcFallback extends plugin {
                 /* pass */
               }
               if (!args || typeof args !== "object") args = {}
-              if (Object.keys(args).length > 0) {
-                const callKey = `${fnName}:${JSON.stringify(args, Object.keys(args).sort())}`
-                if (calledTools.has(callKey)) {
-                  log.warn(`重复工具调用已拦截: ${callKey}`)
-                  return {
-                    name: fnName,
-                    result: `[DUPLICATE] 你已调用过 "${fnName}" 且参数完全一致，结果不会改变。请基于已有信息回复用户。`,
-                  }
-                }
-                calledTools.add(callKey)
-              }
               return await tools().execute(fnName, args, ctx)
             } catch (err) {
               return {
@@ -754,6 +744,8 @@ export class AigcFallback extends plugin {
       return this._sendReply(finalReply.content)
     }
     log.error(`全部失败`)
-    return this.reply("请求失败，请稍后再试", true)
+    // return this.reply("请求失败，请稍后再试", true)
+    const fallbackMsg = ["脑子彻底转不动了…晚点再试试吧~", "信号完全丢失了，稍等一下再来？", "今天状态不太好，一会儿再找我聊？", "唔…好像卡住了，晚点再试试吧！"][Math.floor(Math.random() * 4)]
+    return this.reply(fallbackMsg, true)
   }
 }
