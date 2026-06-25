@@ -21,10 +21,13 @@ git clone https://github.com/kvcfdd/AIGC-Yunzai
 cd AIGC-Yunzai
 
 # 安装依赖
+npm i -g pnpm
 pnpm i
 
-# 安装Playwright浏览器
+# 安装Playwright浏览器  Windows
 npx playwright install chromium
+# 安装Playwright浏览器  Linux
+npx playwright install --with-deps chromium
 
 # 启动
 node app
