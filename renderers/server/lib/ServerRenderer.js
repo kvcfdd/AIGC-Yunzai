@@ -42,13 +42,13 @@ export default class ServerRenderer extends Renderer {
           if (!html && !url) throw new Error("Missing html or url")
 
           // 确定图片格式
-          const imgType = type === "png" ? "png" : "jpeg"
+          const imgType = type === "png" || type === "webp" ? "png" : "jpeg"
 
           // 开始任务
           browser.startTask()
 
           // 获取浏览器实例
-          const chromium = await browser.getBrowser(this.config)
+          const chromium = await browser.getBrowser()
 
           // 创建上下文
           context = await chromium.newContext({

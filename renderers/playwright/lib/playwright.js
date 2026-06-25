@@ -68,7 +68,7 @@ export default class Playwright extends Renderer {
     const start = Date.now()
 
     try {
-      const chromium = await browser.getBrowser(this.config)
+      const chromium = await browser.getBrowser()
       const savePath = this.dealTpl(name, data)
       if (!savePath) return false
 
@@ -114,7 +114,7 @@ export default class Playwright extends Renderer {
 
       // 截图
       let buff = null
-      const isPng = data.imgType === "png"
+      const isPng = data.imgType === "png" || data.imgType === "webp"
       const screenshotOpts = {
         type: isPng ? "png" : "jpeg",
         quality: isPng ? undefined : data.quality || 90,
@@ -143,12 +143,11 @@ export default class Playwright extends Renderer {
 
           const currentSliceHeight = Math.min(pageHeight, totalHeight - y)
 
-          // 使用 locator.screenshot，clip 坐标相对元素，数学直观
-          const slice = await target.screenshot({
+          const slice = await page.screenshot({
             ...screenshotOpts,
             clip: {
-              x: 0,
-              y: y,
+              x: box.x,
+              y: box.y,
               width: box.width,
               height: currentSliceHeight,
             },
