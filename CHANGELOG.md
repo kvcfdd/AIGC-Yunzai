@@ -1,7 +1,6 @@
 # 3.2.0
 
 * 从 TRSS-Yunzai 分支
-* 新增NCQQ专用协议端：NapCat
 * AIGC集成
 
 # 3.1.3

@@ -493,7 +493,7 @@ export class AigcFallback extends plugin {
         const text = this._extractMsgText(msg)
         if (!text) continue
 
-        lines.push(`  - ${time ? `[${time}] ` : ""}[${name}](QQ: ${qq}, 群身份: ${role}): ${text}`)
+        lines.push(`  - ${time ? `[${time}] ` : ""}[${name}](QQ: ${qq}, ${role}): ${text}`)
       }
 
       return lines.length ? lines.join("\n") : null
@@ -538,6 +538,8 @@ export class AigcFallback extends plugin {
         const title = meta?.title || meta?.desc || ""
         const url = meta?.url || meta?.qqdocurl || ""
         parts.push(title ? `[小程序: ${title}](${url})` : url ? `[分享](${url})` : "[分享]")
+      } else if (seg.type === "markdown") {
+        parts.push("[Markdown]")
       }
     }
     return parts.join("").trim()
