@@ -1,5 +1,4 @@
 import cfg from "../../lib/config/config.js"
-import runtime from "../../lib/aigc/runtime.js"
 import common from "../../lib/common/common.js"
 import { formatDate } from "../../lib/aigc/helpers/time.js"
 import { faceName, faceId } from "../../lib/aigc/helpers/face.js"
@@ -92,13 +91,13 @@ export class AigcFallback extends plugin {
   // 全局开关
   async aigcOff() {
     if (!this.e.isMaster) return false
-    await runtime.setEnable(false)
+    cfg.setConfig("aigc", "enable", false)
     return this.reply("AIGC已关闭", true)
   }
 
   async aigcOn() {
     if (!this.e.isMaster) return false
-    await runtime.setEnable(true)
+    cfg.setConfig("aigc", "enable", true)
     return this.reply("AIGC已开启", true)
   }
 
