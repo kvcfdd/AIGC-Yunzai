@@ -7,7 +7,6 @@ import log from "../../lib/aigc/helpers/log.js"
 
 const con = () => Bot.aigc.conversation
 const tools = () => Bot.aigc.tools
-const kb = () => Bot.aigc.knowledge
 const getMaxToolRounds = () => Math.min(Math.max(cfg.aigc?.max_tool_rounds ?? 5, 2), 10)
 
 const AMBIENT_KEY_PREFIX = "aigc:ambient:cooldown"
@@ -24,13 +23,7 @@ export class AigcFallback extends plugin {
         { reg: /^#关闭aigc$/i, fnc: "aigcOff" },
         { reg: /^#开启aigc$/i, fnc: "aigcOn" },
         { reg: /^#结束对话$/i, fnc: "clearConv" },
-        { reg: /^#清除记忆$/i, fnc: "clearConvAndMem" },
         { reg: /^#结束全部对话$/i, fnc: "clearAllConv", permission: "master" },
-        { reg: /^#清除全部记忆$/i, fnc: "clearAllConvAndMem", permission: "master" },
-        { reg: /^#知识库添加(.+)$/i, fnc: "kbAdd" },
-        { reg: /^#知识库删除\s*(\S+)$/i, fnc: "kbRemove" },
-        { reg: /^#知识库列表$/i, fnc: "kbList" },
-        { reg: /^#知识库清除$/i, fnc: "kbClear" },
         { reg: /^(.+)$/, fnc: "aigcChat", log: false },
       ],
     })
@@ -109,7 +102,7 @@ export class AigcFallback extends plugin {
     return this.reply("AIGC已开启", true)
   }
 
-  // 记忆 / 对话清除
+  // 对话清除
   async clearConv() {
     const key = con().sessionKey(this.e.self_id, this.e.user_id)
     const msgs = await con().getMessages(key)
@@ -120,65 +113,11 @@ export class AigcFallback extends plugin {
     return this.reply("对话记录已清除", true)
   }
 
-  async clearConvAndMem() {
-    const key = con().sessionKey(this.e.self_id, this.e.user_id)
-    const mems = await Bot.aigc.memory.getAll(this.e.user_id)
-    const msgs = await con().getMessages(key)
-    if (!Object.keys(mems).length && !msgs.length) return this.reply("暂无对话记录和记忆", true)
-
-    await Bot.aigc.memory.clear(this.e.user_id)
-    await con().clearSession(key)
-    log.info(`用户 ${this.e.user_id} 清除了对话记录和记忆`)
-    return this.reply("对话记录和记忆已清除", true)
-  }
-
   async clearAllConv() {
     if (!this.e.isMaster) return false
     await con().clearAll()
     log.info("管理员清除了全部用户的对话记录")
     return this.reply("已清除全部用户的对话记录", true)
-  }
-
-  async clearAllConvAndMem() {
-    if (!this.e.isMaster) return false
-    await Bot.aigc.memory.clearAll()
-    await con().clearAll()
-    log.info("管理员清除了全部用户的对话记录和记忆")
-    return this.reply("已清除全部用户的对话记录和记忆", true)
-  }
-
-  // 知识库管理
-
-  async kbAdd() {
-    if (!this.e.isMaster) return false
-    const content = this.e.msg.replace(/^#知识库添加/i, "").trim()
-    if (!content) return this.reply("请输入要添加的内容，格式：#知识库添加 <内容>", true)
-    const r = await kb().add(content)
-    if (r.error) return this.reply(`添加失败：${r.error}`, true)
-    return this.reply(`已添加知识 [${r.id}]：${r.content}`, true)
-  }
-
-  async kbRemove() {
-    if (!this.e.isMaster) return false
-    const id = this.e.msg.replace(/^#知识库删除\s*/i, "").trim()
-    if (!id) return this.reply("请输入要删除的知识 ID，格式：#知识库删除 <id>", true)
-    const r = await kb().remove(id)
-    if (r.error) return this.reply(`删除失败：${r.error}`, true)
-    return this.reply(`已删除知识 [${r.id}]`, true)
-  }
-
-  async kbList() {
-    if (!this.e.isMaster) return false
-    const docs = await kb().list()
-    if (!docs.length) return this.reply("知识库为空", true)
-    const lines = docs.map(d => `[${d.id}] ${d.content}`)
-    return this.reply(lines.join("\n"), true)
-  }
-
-  async kbClear() {
-    if (!this.e.isMaster) return false
-    await kb().clear()
-    return this.reply("已清除全部知识库内容", true)
   }
 
   /** 主动插话决策 prompt —— 仅负责判断要不要开口，不干预说话方式 */
@@ -388,12 +327,6 @@ export class AigcFallback extends plugin {
 
     const supplement = this._buildSupplement()
     if (supplement) parts.push(supplement)
-
-    const memCtx = await Bot.aigc.memory.toContext(this.e.user_id)
-    if (memCtx) parts.push(memCtx)
-
-    const kbCtx = await kb().toContext(userMsg)
-    if (kbCtx) parts.push(kbCtx)
 
     const envCtx = await this._buildEnvContext()
     if (envCtx) parts.push(envCtx)
