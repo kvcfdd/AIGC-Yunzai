@@ -21,7 +21,7 @@
     "chalk": "^5.6.2",
     "chokidar": "^5.0.0",
     "compression": "^1.8.1",
-    "es-toolkit": "^1.46.1",
+    "es-toolkit": "^1.49.0",
     "express": "^5.2.1",
     "file-type": "^22.0.1",
     "https-proxy-agent": "^7.0.6",
@@ -37,20 +37,20 @@
     "node-schedule": "^2.1.1",
     "oicq": "link:lib/modules/oicq",
     "playwright": "1.61.1",
-    "pm2": "^7.0.1",
+    "pm2": "^7.0.3",
     "redis": "^4.7.1",
     "sequelize": "^6.37.8",
     "sharp": "^0.34.5",
-    "sqlite3": "5.1.6",
+    "sqlite3": "npm:@karinjs/sqlite3@^0.4.3",
     "strip-ansi": "^7.2.0",
     "turndown": "^7.2.4",
     "ulid": "^3.0.2",
     "undici": "^8.3.0",
-    "ws": "^8.20.1",
+    "ws": "^8.21.0",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "prettier": "^3.8.3"
+    "prettier": "^3.9.4"
   },
   "imports": {
     "#miao": "./plugins/miao-plugin/components/index.js",
