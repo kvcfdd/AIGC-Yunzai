@@ -142,7 +142,7 @@ export class AigcFallback extends plugin {
       `- 有人提问你能答`,
       `- 有人提到你`,
       `- 群里氛围你能自然融入，群友聊什么语气你就用什么语气，别端着`,
-      ``,
+      `- 大家在复读，你感兴趣的话也能参与`,
       `## 规则`,
       `- 不说话 → 只回复 OFF（三个字母，别无其他）`,
       `- 说话 → 直接回复，简短口语化，不超过 40 字`,
@@ -250,6 +250,8 @@ export class AigcFallback extends plugin {
       } else if (seg.type === "at") {
         if (seg.qq == this.e.self_id) continue
         parts.push(`@${this._resolveAtName(seg.qq)}`)
+      } else if (seg.type === "image") {
+        parts.push("[图片]")
       } else if (seg.type === "face") {
         const name = faceName(seg.id)
         parts.push(name ? `[${name}]` : "[表情]")
@@ -310,8 +312,7 @@ export class AigcFallback extends plugin {
       log.error(`对话异常: ${err.message}`)
       // const code = err.code ? `，错误码 ${err.code}` : ""
       // await this.reply(`请求失败${code}，请稍后重试`, true)
-      const retryMsg = ["唔…脑袋突然短路了，等一下再说吧~", "信号好像断掉了，稍等片刻再找我？", "哎呀，网络好像在抽风，一会儿再试试？", "脑子卡住了…先歇几秒再聊！"][Math.floor(Math.random() * 4)]
-      await this.reply(retryMsg, true)
+      await this.reply("我有些累了，请让我休息一会儿", true)
     } finally {
       await redis.del(lockKey)
     }
@@ -345,16 +346,16 @@ export class AigcFallback extends plugin {
     const lines = []
 
     const timeStr = formatDate(new Date(), "full")
-    lines.push(`- 现在是${timeStr}，回复内容请注意时效性。`)
+    lines.push(`- 现在是${timeStr}，回答时请注意时效性。`)
 
     if (cfg.aigc?.split_reply) {
-      lines.push("- 一句话讲不完就<x>拆成多条发,模仿人类打一句话发一句话的习惯,最多允许一次拆3条。注意不要为了拆而拆,而是按实际情况来决定要不要拆！例如: 好的呀<x>那就给你瞧瞧我的本事吧！")
+      lines.push("- 一句话讲不完就<x>拆成多条发,模仿人类打一句话发一句话的习惯,最多允许一次拆3条。例如: 好的呀<x>那就给你瞧瞧我的本事吧！")
+    }
+    if (e.isGroup) {
+      lines.push("- 群聊最近消息仅作为上下文供你参考,帮助你更好地理解当前对话环境,以便做出更合适的回答。")
     }
     if (!ambient) {
       lines.push("- 如果判断出用户的意图不是与你对话,比如误艾特,或者艾特了你但发言意图不是找你,又或者你认为不用回复或不想回复,则只需输出 OFF 即可,不要做任何其他输出。")
-    }
-    if (e.isGroup) {
-      lines.push("- 群聊最近消息仅作为上下文提供给你,帮助你更好地理解当前对话环境,但你的回答不应受其影响。")
     }
     return `<system_supplement>\n${lines.join("\n")}\n</system_supplement>`
   }
@@ -548,7 +549,7 @@ export class AigcFallback extends plugin {
       }
 
       if (res.tool_calls?.length) {
-        if (res.content) await this._splitReply(res.content)
+        if (res.content) await this.e.reply(res.content)
 
         const names = res.tool_calls
           .map(c => c.function?.name)

@@ -67,8 +67,8 @@ export class friendDeal extends plugin {
           reg: /^#获取好友申请列表$/,
           fnc: "listFriends",
           permission: "master",
-        }
-      ]
+        },
+      ],
     })
   }
 

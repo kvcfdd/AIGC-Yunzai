@@ -76,7 +76,7 @@ export class inviteDeal extends plugin {
           fnc: "listInvites",
           permission: "master",
         },
-      ]
+      ],
     })
   }
 
