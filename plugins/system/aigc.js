@@ -28,7 +28,7 @@ async function summarizeOne(self_id, user_id, date) {
     if (ambient.model) opts.model = ambient.model
     const res = await Bot.aigc.provider.chat(
       [
-        { role: "system", content: `你是一个对话总结助手。请将以下用户与AI助手的对话总结为一段简洁的摘要（不超过200字），包含用户问过的主要问题和AI给出的关键信息，即在200字范围内说明聊了哪些内容。只输出摘要文本，不要加任何前缀或解释。\n\n#对话内容：\n${qa}` },
+        { role: "system", content: `你是一个对话总结助手。请以AI助手第一人称的视角将以下用户与AI助手的对话总结为一段摘要（不超过200字），即在200字范围内尽可能详细的说明聊了什么。请直接输出摘要文本，不要加任何前缀或解释。\n\n#对话内容：\n${qa}` },
         { role: "user", content: "[记忆总结触发]" },
       ],
       opts,
