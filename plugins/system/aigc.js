@@ -3,12 +3,144 @@ import common from "../../lib/common/common.js"
 import { formatDate } from "../../lib/aigc/helpers/time.js"
 import { faceName, faceId } from "../../lib/aigc/helpers/face.js"
 import log from "../../lib/aigc/helpers/log.js"
+import { yesterdayStr, dateStr } from "../../lib/aigc/conversation.js"
 
 const con = () => Bot.aigc.conversation
 const tools = () => Bot.aigc.tools
 const getMaxToolRounds = () => Math.min(Math.max(cfg.aigc?.max_tool_rounds ?? 5, 2), 10)
 
 const AMBIENT_KEY_PREFIX = "aigc:ambient:cooldown"
+
+/** 总结单个用户指定日期的对话 → 记忆 → 裁剪 → 删更早键
+ *  返回 { ok, reason? } */
+async function summarizeOne(self_id, user_id, date) {
+  const key = con().sessionKey(self_id, user_id, date)
+  const session = await con()._read(key)
+  if (!session?.messages?.length) return { ok: false, reason: "无对话记录" }
+
+  const qa = con().extractQA(session.messages)
+  if (!qa) return { ok: false, reason: "无可总结内容" }
+
+  try {
+    const ambient = cfg.aigc?.ambient || {}
+    const opts = {}
+    if (ambient.provider) opts.provider = ambient.provider
+    if (ambient.model) opts.model = ambient.model
+    const res = await Bot.aigc.provider.chat(
+      [
+        { role: "system", content: `你是一个对话总结助手。请将以下用户与AI助手的对话总结为一段简洁的摘要（不超过200字），包含用户问过的主要问题和AI给出的关键信息，即在200字范围内说明聊了哪些内容。只输出摘要文本，不要加任何前缀或解释。\n\n#对话内容：\n${qa}` },
+        { role: "user", content: "[记忆总结触发]" },
+      ],
+      opts,
+    )
+    const summary = (res.content || "").trim()
+    if (summary) {
+      await con().addMemory(self_id, user_id, date, summary)
+      log.debug(`记忆已保存: ${self_id}/${user_id}`)
+    }
+  } catch (err) {
+    log.warn(`记忆总结 LLM 调用失败 [${self_id}/${user_id}]: ${err.message}`)
+    return { ok: false, reason: `LLM 调用失败: ${err.message}` }
+  }
+
+  // 裁剪 + 删更早键
+  try {
+    const s = await con()._read(key)
+    if (s) {
+      con().trimTo(s, 5)
+      await con()._write(key, s)
+    }
+    await con().deleteOlderThan(self_id, user_id, date)
+  } catch (err) {
+    log.error(`裁剪失败 [${self_id}/${user_id}]: ${err.message}`)
+  }
+
+  return { ok: true }
+}
+
+/** 扫描今天之前所有未归档日期，按时序逐天总结 */
+async function dailyMemoryJob() {
+  const today = dateStr()
+
+  // 获取所有历史活跃日期，筛选出今天之前的
+  const allDates = await con().scanAllActiveDates()
+  const pastDates = allDates.filter(d => d < today)
+  if (!pastDates.length) {
+    log.info("每日记忆总结: 无历史未归档对话记录")
+    return
+  }
+
+  log.info(`每日记忆总结: 发现 ${pastDates.length} 个历史日期，按时序归档`)
+
+  const failed = []
+  const userLock = async (user_id, fn) => {
+    const lockKey = `aigc:lock:${user_id}`
+    if (await redis.get(lockKey)) return false
+    await redis.set(lockKey, "1", { EX: 300 })
+    try {
+      return await fn()
+    } finally {
+      await redis.del(lockKey)
+    }
+  }
+
+  // 按日期从旧到新，逐天逐人归档
+  for (const targetDate of pastDates.sort()) {
+    const users = await con().scanUsersForDate(targetDate)
+    if (!users.length) {
+      await con().clearActiveUsersForDate(targetDate)
+      continue
+    }
+
+    log.info(`每日记忆总结: 归档 [${targetDate}] ${users.length} 个用户`)
+
+    // 第一轮
+    for (const user of users) {
+      const [self_id, user_id] = user.split(":")
+      const executed = await userLock(user_id, async () => {
+        const result = await summarizeOne(self_id, user_id, targetDate)
+        if (!result.ok) {
+          failed.push({ user, date: targetDate })
+          log.warn(`归档失败 [${user}] (${targetDate}): ${result.reason}`)
+        }
+        return true
+      })
+      if (executed === false) {
+        log.info(`每日记忆总结: 用户忙碌 [${user}] (${targetDate})，加入重试队列`)
+        failed.push({ user, date: targetDate })
+      }
+    }
+
+    // 清理当前日期活跃记录
+    try {
+      await con().clearActiveUsersForDate(targetDate)
+    } catch (err) {
+      log.warn(`清理活跃记录失败 [${targetDate}]: ${err.message}`)
+    }
+  }
+
+  // 重试失败/忙碌的任务
+  if (failed.length) {
+    log.info(`每日记忆总结: 等待 5 秒后重试 ${failed.length} 个失败/忙碌记录`)
+    await Bot.sleep(5000)
+
+    for (const { user, date } of failed) {
+      const [self_id, user_id] = user.split(":")
+      const executed = await userLock(user_id, async () => {
+        const result = await summarizeOne(self_id, user_id, date)
+        if (!result.ok) {
+          log.warn(`每日记忆总结: 重试仍失败 [${user}] (${date}): ${result.reason}，保留完整对话`)
+        }
+        return true
+      })
+      if (executed === false) {
+        log.warn(`每日记忆总结: 重试时用户 [${user}] (${date}) 仍忙碌，保留该日完整对话`)
+      }
+    }
+  }
+
+  log.info("每日记忆总结: 完成")
+}
 
 /** AIGC 入口：被 @ 且无命令匹配时触发，支持工具调用、长期记忆、知识库检索 */
 export class AigcFallback extends plugin {
@@ -18,11 +150,13 @@ export class AigcFallback extends plugin {
       dsc: "AIGC 对话",
       event: "message",
       priority: 999999999,
+      task: { name: "AIGC每日记忆总结", cron: "0 0 * * *", fnc: dailyMemoryJob, log: false },
       rule: [
         { reg: /^#关闭aigc$/i, fnc: "aigcOff" },
         { reg: /^#开启aigc$/i, fnc: "aigcOn" },
         { reg: /^#结束对话$/i, fnc: "clearConv" },
         { reg: /^#结束全部对话$/i, fnc: "clearAllConv", permission: "master" },
+        { reg: /^#总结记忆$/i, fnc: "manualMemory", permission: "master" },
         { reg: /^(.+)$/, fnc: "aigcChat", log: false },
       ],
     })
@@ -103,11 +237,10 @@ export class AigcFallback extends plugin {
 
   // 对话清除
   async clearConv() {
-    const key = con().sessionKey(this.e.self_id, this.e.user_id)
-    const msgs = await con().getMessages(key)
+    const msgs = await con().getMessages(this.e.self_id, this.e.user_id)
     if (!msgs.length) return this.reply("暂无对话记录", true)
 
-    await con().clearSession(key)
+    await con().clearSession(this.e.self_id, this.e.user_id)
     log.info(`用户 ${this.e.user_id} 清除了对话记录`)
     return this.reply("对话记录已清除", true)
   }
@@ -117,6 +250,24 @@ export class AigcFallback extends plugin {
     await con().clearAll()
     log.info("管理员清除了全部用户的对话记录")
     return this.reply("已清除全部用户的对话记录", true)
+  }
+
+  /** 手动触发昨天的记忆总结，便于测试或补漏 */
+  async manualMemory() {
+    if (!this.e.isMaster) return false
+    const yesterday = yesterdayStr()
+
+    if (await con().hasMemoryForDate(this.e.self_id, this.e.user_id, yesterday)) {
+      return this.reply("昨天的对话已总结过，无需重复触发", true)
+    }
+
+    await con().addActiveUser(yesterday, this.e.self_id, this.e.user_id)
+    const result = await summarizeOne(this.e.self_id, this.e.user_id, yesterday)
+
+    if (result.ok) {
+      return this.reply("记忆总结完成", true)
+    }
+    return this.reply(`总结失败: ${result.reason}`, true)
   }
 
   /** 主动插话决策 prompt —— 仅负责判断要不要开口，不干预说话方式 */
@@ -143,6 +294,7 @@ export class AigcFallback extends plugin {
       `- 有人提到你`,
       `- 群里氛围你能自然融入，群友聊什么语气你就用什么语气，别端着`,
       `- 大家在复读，你感兴趣的话也能参与`,
+      ``,
       `## 规则`,
       `- 不说话 → 只回复 OFF（三个字母，别无其他）`,
       `- 说话 → 直接回复，简短口语化，不超过 40 字`,
@@ -283,7 +435,16 @@ export class AigcFallback extends plugin {
 
       if (!this.e.atBot) {
         const ambient = cfg.aigc?.ambient
-        if (ambient?.enable) return this._ambientTry()
+        if (ambient?.enable) {
+          const lockKey = `aigc:lock:${this.e.user_id}`
+          if (await redis.get(lockKey)) return false
+          await redis.set(lockKey, "1", { EX: 300 })
+          try {
+            return await this._ambientTry()
+          } finally {
+            await redis.del(lockKey)
+          }
+        }
         return false
       }
     }
@@ -301,6 +462,7 @@ export class AigcFallback extends plugin {
     await redis.set(lockKey, "1", { EX: 300 })
 
     const key = con().sessionKey(this.e.self_id, this.e.user_id)
+    await con().addActiveUser(dateStr(), this.e.self_id, this.e.user_id)
 
     log.info(`用户 ${this.e.user_id} 发起对话`)
 
@@ -324,6 +486,9 @@ export class AigcFallback extends plugin {
 
     const identity = this._buildIdentity()
     if (identity) parts.push(identity)
+
+    const memories = await con().getMemories(this.e.self_id, this.e.user_id)
+    if (memories) parts.push(`<user_memories>\n以下是用户与你的历史对话摘要供参考：\n${memories}\n</user_memories>`)
 
     const supplement = this._buildSupplement()
     if (supplement) parts.push(supplement)
@@ -519,7 +684,7 @@ export class AigcFallback extends plugin {
   /** 工具调用循环：LLM 回复 → tool_calls 则执行并回传 → 文本则发送并退出。
    *  整轮对话在内存中累积，最终回复生成后才原子写入缓存，避免中途死机留下残缺记录。 */
   async _replyLoop(sessionKey, userMsg, images, systemPrompt) {
-    const rawHistory = await con().getMessages(sessionKey)
+    const rawHistory = await con().getMessages(this.e.self_id, this.e.user_id)
     const baseMessages = rawHistory.filter(m => m.role !== "system")
     const systemMsg = { role: "system", content: systemPrompt }
     const pending = []
