@@ -285,6 +285,7 @@ export class AigcFallback extends plugin {
       ``,
       `## 不该说话`,
       `- 话题跟你无关、插不上嘴`,
+      `- 最近已经说过话了，没必要重复`,
       `- 闲聊开玩笑、你没实质性内容`,
       `- 只是表情、问候、附和`,
       `- 没看懂、听不懂 → 别硬接，沉默`,
@@ -541,10 +542,11 @@ export class AigcFallback extends plugin {
     const lines = []
 
     const timeStr = formatDate(new Date(), "full")
-    lines.push(`- 现在是${timeStr}，回答时请注意时效性。`)
+    lines.push(`- 现在是${timeStr},请注意时间变化,回答时注意时效性,避免回答过时信息。`)
 
     if (cfg.aigc?.split_reply) {
       lines.push("- 一句话讲不完就<x>拆成多条发,模仿人类打一句话发一句话的习惯,最多允许一次拆3条。例如: 好的呀<x>那就给你瞧瞧我的本事吧！")
+      lines.push("- 注意不要连续使用一种拆法,因为没有人每次都发固定几条消息,所以要按实际所需拆分,不要每次都拆成3条,也不要每次都拆成2条,有时也可以不拆。")
     }
     if (e.isGroup) {
       lines.push("- 群聊最近消息仅作为上下文供你参考,帮助你更好地理解当前对话环境,以便做出更合适的回答。")
