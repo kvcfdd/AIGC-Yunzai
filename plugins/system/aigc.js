@@ -11,6 +11,10 @@ const getMaxToolRounds = () => Math.min(Math.max(cfg.aigc?.max_tool_rounds ?? 5,
 
 const AMBIENT_KEY_PREFIX = "aigc:ambient:cooldown"
 
+// 请求合并: user_id → { controller, pendingMsg, pendingImg, pendingVideo }
+// 同一用户触发新对话时，取消上一轮未完成的请求，合并消息/图片/视频后重发
+const activeRequests = new Map()
+
 /** 总结单个用户指定日期的对话 → 记忆 → 裁剪 → 删更早键
  *  返回 { ok, reason? } */
 async function summarizeOne(self_id, user_id, date) {
@@ -304,7 +308,7 @@ export class AigcFallback extends plugin {
 
   /** 主动插话：非 @ 触发，LLM 自主决定是否参与群聊。
    *  不走对话缓存、不带工具，回复不污染 conversation。 */
-  async _ambientTry() {
+  async _ambientTry(signal) {
     const gid = String(this.e.group_id)
     const cooldownKey = `${AMBIENT_KEY_PREFIX}:${gid}`
 
@@ -345,6 +349,7 @@ export class AigcFallback extends plugin {
       ]
 
       const opts = {}
+      if (signal) opts.signal = signal
       if (ambient.provider) opts.provider = ambient.provider
       if (ambient.model) opts.model = ambient.model
       const res = await Bot.aigc.provider.chat(messages, opts)
@@ -356,6 +361,7 @@ export class AigcFallback extends plugin {
       }
 
       log.info(`群 ${gid} 主动插话: 回复`)
+      activeRequests.delete(this.e.user_id)
       return this._sendReply(text, false)
     } catch (err) {
       log.warn(`群 ${gid} 主动插话异常: ${err.message}`)
@@ -404,6 +410,8 @@ export class AigcFallback extends plugin {
         parts.push(`@${this._resolveAtName(seg.qq)}`)
       } else if (seg.type === "image") {
         parts.push("[图片]")
+      } else if (seg.type === "video") {
+        parts.push("[视频]")
       } else if (seg.type === "face") {
         const name = faceName(seg.id)
         parts.push(name ? `[${name}]` : "[表情]")
@@ -436,13 +444,15 @@ export class AigcFallback extends plugin {
       if (!this.e.atBot) {
         const ambient = cfg.aigc?.ambient
         if (ambient?.enable) {
-          const lockKey = `aigc:lock:${this.e.user_id}`
-          if (await redis.get(lockKey)) return false
-          await redis.set(lockKey, "1", { EX: 300 })
+          if (activeRequests.has(this.e.user_id)) return false
+          const ambController = new AbortController()
+          activeRequests.set(this.e.user_id, { controller: ambController, pendingMsg: "", pendingImg: [], pendingVideo: [] })
           try {
-            return await this._ambientTry()
+            return await this._ambientTry(ambController.signal)
           } finally {
-            await redis.del(lockKey)
+            if (activeRequests.get(this.e.user_id)?.controller === ambController) {
+              activeRequests.delete(this.e.user_id)
+            }
           }
         }
         return false
@@ -456,10 +466,23 @@ export class AigcFallback extends plugin {
     const prefixFilter = cfg.aigc?.prefix_filter
     if (prefixFilter?.length && prefixFilter.some(p => userMsg.startsWith(p))) return false
 
-    // 并发锁：同一用户上一轮未结束时拒绝新请求，5 分钟自动过期
-    const lockKey = `aigc:lock:${this.e.user_id}`
-    if (await redis.get(lockKey)) return false
-    await redis.set(lockKey, "1", { EX: 300 })
+    // 请求合并：上一轮未完成时取消旧请求，合并消息/图片/视频后重发
+    let finalMsg = userMsg
+    let finalImg = this.e.img || []
+    let finalVideo = this.e.video || []
+    const existing = activeRequests.get(this.e.user_id)
+    if (existing) {
+      existing.controller.abort()
+      finalMsg = existing.pendingMsg ? existing.pendingMsg + "\n" + userMsg : userMsg
+      if (existing.pendingImg?.length) {
+        finalImg = [...existing.pendingImg, ...finalImg]
+      }
+      if (existing.pendingVideo?.length) {
+        finalVideo = [...existing.pendingVideo, ...finalVideo]
+      }
+    }
+    const controller = new AbortController()
+    activeRequests.set(this.e.user_id, { controller, pendingMsg: finalMsg, pendingImg: finalImg, pendingVideo: finalVideo })
 
     const key = con().sessionKey(this.e.self_id, this.e.user_id)
     await con().addActiveUser(dateStr(), this.e.self_id, this.e.user_id)
@@ -467,16 +490,23 @@ export class AigcFallback extends plugin {
     log.info(`用户 ${this.e.user_id} 发起对话`)
 
     try {
-      const systemPrompt = await this._buildSystem(userMsg)
-      const images = await Bot.aigc.provider.resolveImages(this.e.img)
-      await this._replyLoop(key, userMsg, images, systemPrompt)
+      const systemPrompt = await this._buildSystem(finalMsg)
+      const images = await Bot.aigc.provider.resolveImages(finalImg)
+      const videos = await Bot.aigc.provider.resolveVideo(finalVideo)
+      await this._replyLoop(key, finalMsg, images, videos, systemPrompt, controller.signal)
     } catch (err) {
+      if (err?.name === "AbortError") {
+        log.info(`用户 ${this.e.user_id} 打断`)
+        return false
+      }
       log.error(`对话异常: ${err.message}`)
       // const code = err.code ? `，错误码 ${err.code}` : ""
       // await this.reply(`请求失败${code}，请稍后重试`, true)
       await this.reply("我有些累了，请让我休息一会儿", true)
     } finally {
-      await redis.del(lockKey)
+      if (activeRequests.get(this.e.user_id)?.controller === controller) {
+        activeRequests.delete(this.e.user_id)
+      }
     }
   }
 
@@ -625,7 +655,8 @@ export class AigcFallback extends plugin {
         const name = faceName(seg.id)
         parts.push(name ? `[${name}]` : "[表情]")
       } else if (seg.type === "video") {
-        parts.push("[视频]")
+        const url = seg.url || seg.file || ""
+        parts.push(url ? `[视频](${url})` : "[视频]")
       } else if (seg.type === "record" || seg.type === "audio") {
         parts.push("[语音]")
       } else if (seg.type === "reply") {
@@ -683,8 +714,9 @@ export class AigcFallback extends plugin {
 
   /** 工具调用循环：LLM 回复 → tool_calls 则执行并回传 → 文本则发送并退出。
    *  整轮对话在内存中累积，最终回复生成后才原子写入缓存，避免中途死机留下残缺记录。 */
-  async _replyLoop(sessionKey, userMsg, images, systemPrompt) {
+  async _replyLoop(sessionKey, userMsg, images, videos, systemPrompt, signal) {
     const rawHistory = await con().getMessages(this.e.self_id, this.e.user_id)
+    for (const m of rawHistory) delete m.videos
     const baseMessages = rawHistory.filter(m => m.role !== "system")
     const systemMsg = { role: "system", content: systemPrompt }
     const pending = []
@@ -696,10 +728,12 @@ export class AigcFallback extends plugin {
       if (!userPushed) {
         const um = { role: "user", content: userMsg }
         if (images) um.images = images
+        if (videos) um.videos = videos
         messages.push(um)
       }
 
       const opts = {}
+      if (signal) opts.signal = signal
       const toolDefs = tools().getDefinitions()
       if (toolDefs.length) {
         opts.tools = toolDefs
@@ -728,6 +762,7 @@ export class AigcFallback extends plugin {
             content: userMsg,
             ...this._userMsgMeta(),
             ...(images ? { images } : {}),
+            ...(videos ? { videos } : {}),
           })
           userPushed = true
         }
@@ -764,11 +799,18 @@ export class AigcFallback extends plugin {
           const r = results[i]
           const callId = res.tool_calls[i]?.id || `call_${i}`
           const payload = "error" in r ? r.error : r.result
-          let content, images
-          if (payload && typeof payload === "object" && Array.isArray(payload.images)) {
-            images = payload.images
-            content = payload.text || "图片获取成功"
-          } else {
+          let content, images, videos
+          if (payload && typeof payload === "object") {
+            if (Array.isArray(payload.images)) {
+              images = payload.images
+              content = payload.text || "图片获取成功"
+            }
+            if (Array.isArray(payload.videos)) {
+              videos = payload.videos
+              content = payload.text || "视频获取成功"
+            }
+          }
+          if (!content) {
             content = typeof payload === "string" ? payload : JSON.stringify(payload ?? "")
           }
           if (lastRound && i === results.length - 1) {
@@ -779,6 +821,7 @@ export class AigcFallback extends plugin {
             content,
             tool_call_id: callId,
             ...(images?.length ? { images } : {}),
+            ...(videos?.length ? { videos } : {}),
           })
         }
         continue
@@ -798,6 +841,7 @@ export class AigcFallback extends plugin {
             content: userMsg,
             ...this._userMsgMeta(),
             ...(images ? { images } : {}),
+            ...(videos ? { videos } : {}),
           })
           userPushed = true
         }
@@ -810,6 +854,7 @@ export class AigcFallback extends plugin {
           await this.reply(thinkingMsg, true)
         }
 
+        activeRequests.delete(this.e.user_id)
         return this._sendReply(res.content)
       }
 
@@ -824,11 +869,13 @@ export class AigcFallback extends plugin {
         content: userMsg,
         ...this._userMsgMeta(),
         ...(images ? { images } : {}),
+        ...(videos ? { videos } : {}),
       })
       userPushed = true
     }
     const finalMessages = [systemMsg, ...baseMessages, ...pending]
     const finalOpts = {}
+    if (signal) finalOpts.signal = signal
     const finalToolDefs = tools().getDefinitions()
     if (finalToolDefs.length) {
       finalOpts.tools = finalToolDefs
@@ -841,6 +888,7 @@ export class AigcFallback extends plugin {
       pending.push(this._buildAssistantMsg(finalReply))
       await con().appendMessages(sessionKey, pending)
       log.warn(`工具轮次超限，降级回复成功`)
+      activeRequests.delete(this.e.user_id)
       return this._sendReply(finalReply.content)
     }
     log.error(`全部失败`)

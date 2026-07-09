@@ -24,7 +24,7 @@ max_tokens: 4096
 temperature: 1
 # 工具调用轮次上限 (2-10)
 max_tool_rounds: 5
-# 请求失败重试次数 (0-5, 0不重试)
+# 请求失败重试次数 (0-10, 0不重试)
 retry_count: 0
 # 机器人名称(AIGC相关日志显示)
 bot_name: AIGC
