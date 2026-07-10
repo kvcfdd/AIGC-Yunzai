@@ -28,7 +28,6 @@ async function summarizeOne(self_id, user_id, date) {
   try {
     const ambient = cfg.aigc?.ambient || {}
     const opts = {}
-    if (ambient.provider) opts.provider = ambient.provider
     if (ambient.model) opts.model = ambient.model
     const res = await Bot.aigc.provider.chat(
       [
@@ -351,7 +350,6 @@ export class AigcFallback extends plugin {
 
       const opts = {}
       if (signal) opts.signal = signal
-      if (ambient.provider) opts.provider = ambient.provider
       if (ambient.model) opts.model = ambient.model
       const res = await Bot.aigc.provider.chat(messages, opts)
       const text = (res.content || "").trim()
@@ -493,7 +491,8 @@ export class AigcFallback extends plugin {
     try {
       const systemPrompt = await this._buildSystem(finalMsg)
       const images = await Bot.aigc.provider.resolveImages(finalImg)
-      const videos = await Bot.aigc.provider.resolveVideo(finalVideo)
+      const removeAudio = /^gemma/i.test(cfg.aigc?.gemini?.model || "")
+      const videos = await Bot.aigc.provider.resolveVideo(finalVideo, removeAudio, controller.signal)
       await this._replyLoop(key, finalMsg, images, videos, systemPrompt, controller.signal)
     } catch (err) {
       if (err?.name === "AbortError") {
@@ -770,9 +769,11 @@ export class AigcFallback extends plugin {
         }
         pending.push(this._buildAssistantMsg(res))
 
-        const ctx = { user_id: this.e.user_id, event: this.e }
+        const ctx = { user_id: this.e.user_id, event: this.e, signal }
+        if (signal?.aborted) throw new DOMException("Aborted", "AbortError")
         const results = await Promise.all(
           res.tool_calls.map(async tc => {
+            if (signal?.aborted) return { name: tc?.function?.name || "unknown", error: "Aborted" }
             try {
               const fnName = tc?.function?.name
               if (!fnName)
@@ -833,6 +834,10 @@ export class AigcFallback extends plugin {
         const text = (res.content || "").trim()
         if (!text || /^OFF$/i.test(text)) {
           if (!userPushed) return false
+          for (const m of pending) {
+            if (m.videos?.length) m.content = (m.content || "").replace(/\[视频\]/g, "[视频已过期]")
+            delete m.videos
+          }
           await con().appendMessages(sessionKey, pending)
           return false
         }
@@ -849,6 +854,10 @@ export class AigcFallback extends plugin {
         }
         pending.push(this._buildAssistantMsg(res))
 
+        for (const m of pending) {
+          if (m.videos?.length) m.content = (m.content || "").replace(/\[视频\]/g, "[视频已过期]")
+          delete m.videos
+        }
         await con().appendMessages(sessionKey, pending)
 
         if (res.reasoning_content && cfg.aigc?.show_thinking) {
@@ -888,6 +897,10 @@ export class AigcFallback extends plugin {
     // 纯文本回复，正常保存并发送
     if (finalReply.content) {
       pending.push(this._buildAssistantMsg(finalReply))
+      for (const m of pending) {
+        if (m.videos?.length) m.content = (m.content || "").replace(/\[视频\]/g, "[视频已过期]")
+        delete m.videos
+      }
       await con().appendMessages(sessionKey, pending)
       log.warn(`工具轮次超限，降级回复成功`)
       activeRequests.delete(this.e.user_id)
