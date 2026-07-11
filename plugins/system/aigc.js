@@ -283,25 +283,25 @@ export class AigcFallback extends plugin {
       `你在群里看大家聊天。不说话是常态，大多数人 80% 的时间在划水。`,
       ``,
       `## 不该说话`,
-      `- 话题跟你无关、插不上嘴`,
-      `- 最近已经说过话了，没必要重复`,
-      `- 闲聊开玩笑、你没实质性内容`,
-      `- 只是表情、问候、附和`,
-      `- 没看懂、听不懂 → 别硬接，沉默`,
-      `- 对方故意激怒你、给你下套 → 别上套，沉默`,
-      `- 已经有人接了、话题在收尾`,
-      `- 单纯不想回、不感兴趣`,
+      `话题跟你无关、插不上嘴`,
+      `最近已经说过话了，没必要重复`,
+      `闲聊开玩笑、你没实质性内容`,
+      `只是表情、问候、附和`,
+      `没看懂、听不懂 → 别硬接，沉默`,
+      `对方故意激怒你、给你下套 → 别上套，沉默`,
+      `已经有人接了、话题在收尾`,
+      `单纯不想回、不感兴趣`,
       ``,
       `## 可以说话`,
-      `- 讨论你擅长的，有内容可补充`,
-      `- 有人提问你能答`,
-      `- 有人提到你`,
-      `- 群里氛围你能自然融入，群友聊什么语气你就用什么语气，别端着`,
-      `- 大家在复读，你感兴趣的话也能参与`,
+      `讨论你擅长的，有内容可补充`,
+      `有人提问你能答`,
+      `有人提到你`,
+      `群里氛围你能自然融入，群友聊什么语气你就用什么语气，别端着`,
+      `大家在复读，你感兴趣的话也能参与`,
       ``,
       `## 规则`,
-      `- 不说话 → 只回复 OFF（三个字母，别无其他）`,
-      `- 说话 → 直接回复，简短口语化，不超过 40 字`,
+      `不说话 → 只回复 OFF（三个字母，别无其他）`,
+      `说话 → 直接回复，简短口语化，不超过 40 字`,
     ]
     return lines.join("\n")
   }
@@ -517,11 +517,11 @@ export class AigcFallback extends plugin {
     const identity = this._buildIdentity()
     if (identity) parts.push(identity)
 
-    const memories = await con().getMemories(this.e.self_id, this.e.user_id)
-    if (memories) parts.push(`<user_memories>\n以下是用户与你的历史对话摘要供参考：\n${memories}\n</user_memories>`)
-
     const supplement = this._buildSupplement()
     if (supplement) parts.push(supplement)
+
+    const memories = await con().getMemories(this.e.self_id, this.e.user_id)
+    if (memories) parts.push(`<user_memories>\n${memories}\n</user_memories>`)
 
     const envCtx = await this._buildEnvContext()
     if (envCtx) parts.push(envCtx)
@@ -537,23 +537,19 @@ export class AigcFallback extends plugin {
 
   /** 系统补充信息 */
   _buildSupplement(ambient = false) {
-    const e = this.e
     const lines = []
 
     const timeStr = formatDate(new Date(), "full")
-    lines.push(`- 现在是${timeStr},请注意时间变化,回答时注意时效性,避免回答过时信息。`)
+    lines.push(`现在是${timeStr},请注意时间变化,回答时注意时效性,避免回答过时信息。`)
 
     if (cfg.aigc?.split_reply) {
-      lines.push("- 一句话讲不完就<x>拆成多条发,模仿人类打一句话发一句话的习惯,最多允许一次拆3条。例如: 好的呀<x>那就给你瞧瞧我的本事吧！")
-      lines.push("- 注意不要连续使用一种拆法,因为没有人每次都发固定几条消息,所以要按实际所需拆分,不要每次都拆成3条,也不要每次都拆成2条,有时也可以不拆。")
-    }
-    if (e.isGroup) {
-      lines.push("- 群聊最近消息仅作为上下文供你参考,帮助你更好地理解当前对话环境,以便做出更合适的回答。")
+      lines.push("一句话讲不完就<x>拆成多条发,模仿人类打一句话发一句话的习惯,最多允许一次拆3条。例如: 好的呀<x>那就给你瞧瞧我的本事吧！")
+      lines.push("注意不要连续使用一种拆法,因为没有人每次都发固定几条消息,所以要按实际所需拆分,不要每次都拆成3条,也不要每次都拆成2条,有时也可以不拆。")
     }
     if (!ambient) {
-      lines.push("- 如果判断出用户的意图不是与你对话,比如误艾特,或者艾特了你但发言意图不是找你,又或者你认为不用回复或不想回复,则只需输出 OFF 即可,不要做任何其他输出。")
+      lines.push("如果不想回复,则直接输出 OFF 即可,不要做任何其他输出。")
     }
-    return `<system_supplement>\n${lines.join("\n")}\n</system_supplement>`
+    return `\n${lines.join("\n")}\n`
   }
 
   /** 群聊/私聊信息 */
@@ -569,16 +565,16 @@ export class AigcFallback extends plugin {
 
       const card = e.sender?.card || e.sender?.nickname || ""
       const role = { owner: "群主", admin: "群管理员", member: "群成员" }[e.member?.role] || e.member?.role || "群成员"
-      const sex = { male: "男", female: "女", unknown: "未知" }[e.member?.sex] || e.member?.sex || "未知"
 
       const lines = []
-      lines.push(`- 类型: 群聊`)
-      lines.push(`- 群名: ${e.group_name || "Unknown"} (ID: ${e.group_id})`)
-      lines.push(`- 你的群昵称: ${botName}`)
-      lines.push(`- 你的QQ: ${e.self_id}`)
-      lines.push(`- 你的头像: https://q.qlogo.cn/g?b=qq&s=0&nk=${e.self_id}`)
+      lines.push(`类型: 群聊`)
+      lines.push(`群名: ${e.group_name || "Unknown"} (ID: ${e.group_id})`)
+      lines.push(`你的群昵称: ${botName}`)
+      lines.push(`你的QQ: ${e.self_id}`)
+      lines.push(`你的头像: https://q.qlogo.cn/g?b=qq&s=0&nk=${e.self_id}`)
       const avatar = e.sender?.getAvatarUrl?.() || e.member?.getAvatarUrl?.() || `https://q.qlogo.cn/g?b=qq&s=0&nk=${e.user_id}`
-      lines.push(`- 当前说话人: [${card}](QQ: ${e.user_id}, 性别: ${sex}, 群身份: ${role}, 头像: ${avatar})`)
+      lines.push(`当前说话人: [${card}](QQ: ${e.user_id}, 群身份: ${role}, 头像: ${avatar})`)
+      lines.push(`备注: 群聊最近消息仅作为上下文供你参考,帮助你更好地理解当前对话环境,以便做出更合适的回答。`)
 
       const histCount = cfg.aigc?.group_history_count ?? 30
       if (histCount > 0) {
@@ -591,7 +587,7 @@ export class AigcFallback extends plugin {
 
     const name = e.sender?.nickname || "Unknown"
     const avatar = e.sender?.getAvatarUrl?.() || `https://q.qlogo.cn/g?b=qq&s=0&nk=${e.user_id}`
-    return `<chat_context>\n- 类型: 私聊\n- 你的QQ: ${e.self_id}\n- 你的头像: https://q.qlogo.cn/g?b=qq&s=0&nk=${e.self_id}\n- 用户: [${name}](QQ: ${e.user_id}, 头像: ${avatar})\n</chat_context>`
+    return `<chat_context>\n类型: 私聊\n你的QQ: ${e.self_id}\n你的头像: https://q.qlogo.cn/g?b=qq&s=0&nk=${e.self_id}\n用户: [${name}](QQ: ${e.user_id}, 头像: ${avatar})\n</chat_context>`
   }
 
   /** 获取群聊最近 N 条消息 */
@@ -622,7 +618,7 @@ export class AigcFallback extends plugin {
         const text = this._extractMsgText(msg)
         if (!text) continue
 
-        lines.push(`  - ${time ? `[${time}] ` : ""}[${name}](QQ: ${qq}, ${role}): ${text}`)
+        lines.push(`    ${time ? `[${time}] ` : ""}[${name}](QQ: ${qq}, ${role}): ${text}`)
       }
 
       return lines.length ? lines.join("\n") : null
@@ -717,7 +713,6 @@ export class AigcFallback extends plugin {
    *  整轮对话在内存中累积，最终回复生成后才原子写入缓存，避免中途死机留下残缺记录。 */
   async _replyLoop(sessionKey, userMsg, images, videos, systemPrompt, signal) {
     const rawHistory = await con().getMessages(this.e.self_id, this.e.user_id)
-    for (const m of rawHistory) delete m.videos
     const baseMessages = rawHistory.filter(m => m.role !== "system")
     const systemMsg = { role: "system", content: systemPrompt }
     const pending = []
@@ -749,7 +744,7 @@ export class AigcFallback extends plugin {
       }
 
       if (res.tool_calls?.length) {
-        if (res.content) await this.e.reply(res.content)
+        if (res.content) await this._sendReply(res.content, false)
 
         const names = res.tool_calls
           .map(c => c.function?.name)
