@@ -18,6 +18,10 @@ const activeRequests = new Map()
 /** 总结单个用户指定日期的对话 → 记忆 → 裁剪 → 删更早键
  *  返回 { ok, reason? } */
 async function summarizeOne(self_id, user_id, date) {
+  if (await con().hasMemoryForDate(self_id, user_id, date)) {
+    return { ok: true, reason: "已存在记忆，跳过" }
+  }
+
   const key = con().sessionKey(self_id, user_id, date)
   const session = await con()._read(key)
   if (!session?.messages?.length) return { ok: false, reason: "无对话记录" }
@@ -27,7 +31,7 @@ async function summarizeOne(self_id, user_id, date) {
 
   try {
     const ambient = cfg.aigc?.ambient || {}
-    const opts = {}
+    const opts = { stateful: false, retry_count: 2 }
     if (ambient.model) opts.model = ambient.model
     const res = await Bot.aigc.provider.chat(
       [
@@ -97,6 +101,8 @@ async function dailyMemoryJob() {
 
     log.info(`每日记忆总结: 归档 [${targetDate}] ${users.length} 个用户`)
 
+    const succeeded = new Set()
+
     // 第一轮
     for (const user of users) {
       const [self_id, user_id] = user.split(":")
@@ -105,6 +111,8 @@ async function dailyMemoryJob() {
         if (!result.ok) {
           failed.push({ user, date: targetDate })
           log.warn(`归档失败 [${user}] (${targetDate}): ${result.reason}`)
+        } else {
+          succeeded.add(user)
         }
         return true
       })
@@ -114,11 +122,13 @@ async function dailyMemoryJob() {
       }
     }
 
-    // 清理当前日期活跃记录
-    try {
-      await con().clearActiveUsersForDate(targetDate)
-    } catch (err) {
-      log.warn(`清理活跃记录失败 [${targetDate}]: ${err.message}`)
+    // 当前日期全部成功 → 清除活跃记录；否则保留待下次 cron 补漏
+    if (succeeded.size === users.length) {
+      try {
+        await con().clearActiveUsersForDate(targetDate)
+      } catch (err) {
+        log.warn(`清理活跃记录失败 [${targetDate}]: ${err.message}`)
+      }
     }
   }
 
@@ -131,13 +141,30 @@ async function dailyMemoryJob() {
       const [self_id, user_id] = user.split(":")
       const executed = await userLock(user_id, async () => {
         const result = await summarizeOne(self_id, user_id, date)
-        if (!result.ok) {
-          log.warn(`每日记忆总结: 重试仍失败 [${user}] (${date}): ${result.reason}，保留完整对话`)
+        if (result.ok) {
+          // 重试成功 → 检查该日期所有活跃用户是否都已生成记忆
+          const allUsers = await con().scanUsersForDate(date)
+          if (allUsers.length) {
+            let allDone = true
+            for (const u of allUsers) {
+              const [s, uid] = u.split(":")
+              if (!(await con().hasMemoryForDate(s, uid, date))) {
+                allDone = false
+                break
+              }
+            }
+            if (allDone) {
+              await con().clearActiveUsersForDate(date)
+              log.info(`日期 [${date}] 所有用户归档完成，活跃记录已清理`)
+            }
+          }
+        } else {
+          log.warn(`每日记忆总结: 重试仍失败 [${user}] (${date}): ${result.reason}，保留活跃记录待下次 cron 补漏`)
         }
         return true
       })
       if (executed === false) {
-        log.warn(`每日记忆总结: 重试时用户 [${user}] (${date}) 仍忙碌，保留该日完整对话`)
+        log.warn(`每日记忆总结: 重试时用户 [${user}] (${date}) 仍忙碌，保留活跃记录待下次 cron 补漏`)
       }
     }
   }
@@ -208,14 +235,54 @@ export class AigcFallback extends plugin {
     return parts
   }
 
-  /** 按 <x> 分隔符拆分为多条消息依次发送 */
-  async _splitReply(text, quote = true) {
-    const parts = text.split(/<x>/)
-    if (parts.length <= 1) return this.reply(text, quote)
+  /** 发送回复：检查语音标识 → 若开启则转语音，否则纯文本 */
+  async _sendReply(text, quote = true) {
+    try {
+      const emo_switch = await Bot.aigc.voice.consume(this.e.user_id)
+      if (emo_switch) {
+        const audioUrl = await Bot.aigc.voice.tts(text, emo_switch)
+        return this.e.reply(segment.record(audioUrl))
+      }
+    } catch (err) {
+      log.error(`语音转换失败，降级为文本: ${err.message}`)
+    }
+    return this.reply(text, quote)
+  }
+
+  /** 解析 XML 标签回复 → [{ type: "reply"|"voice", text }]，无标签返回 [] */
+  _parseTaggedReply(text) {
+    const parts = []
+    const re = /<(reply|voice)>(.*?)<\/\1>/gs
+    let m
+    while ((m = re.exec(text)) !== null) {
+      const content = m[2].trim()
+      if (content) parts.push({ type: m[1], text: content })
+    }
+    return parts
+  }
+
+  /** 处理带标签的回复：<reply> 发文本，<voice> 转语音，支持混排多条 */
+  async _sendTaggedReply(parts, quote = true) {
+    const emo_switch = await Bot.aigc.voice.consume(this.e.user_id).catch(() => null)
     for (let i = 0; i < parts.length; i++) {
-      const t = parts[i].trim()
-      if (!t) continue
-      await this.reply(t, i === 0 && quote)
+      const { type, text } = parts[i]
+      if (!text) continue
+      if (type === "voice") {
+        try {
+          const vcfg = cfg.aigc?.voice || {}
+          if (vcfg.api_key && vcfg.voice_id) {
+            const audioUrl = await Bot.aigc.voice.tts(text, emo_switch)
+            await this.e.reply(segment.record(audioUrl))
+          } else {
+            await this.reply(text, i === 0 && quote)
+          }
+        } catch (err) {
+          log.error(`语音转换失败，降级为文本: ${err.message}`)
+          await this.reply(text, i === 0 && quote)
+        }
+      } else {
+        await this.reply(text, i === 0 && quote)
+      }
       if (i < parts.length - 1) await new Promise(r => setTimeout(r, Math.random() * 1000 + 1000))
     }
   }
@@ -271,101 +338,6 @@ export class AigcFallback extends plugin {
       return this.reply("记忆总结完成", true)
     }
     return this.reply(`总结失败: ${result.reason}`, true)
-  }
-
-  /** 主动插话决策 prompt —— 仅负责判断要不要开口，不干预说话方式 */
-  _buildAmbientPrompt() {
-    const systemPrompt = cfg.aigc?.system_prompt || "你的名字叫云崽，一个智能助手。"
-    const lines = [
-      `## System Prompt`,
-      `${systemPrompt}`,
-      ``,
-      `你在群里看大家聊天。不说话是常态，大多数人 80% 的时间在划水。`,
-      ``,
-      `## 不该说话`,
-      `话题跟你无关、插不上嘴`,
-      `最近已经说过话了，没必要重复`,
-      `闲聊开玩笑、你没实质性内容`,
-      `只是表情、问候、附和`,
-      `没看懂、听不懂 → 别硬接，沉默`,
-      `对方故意激怒你、给你下套 → 别上套，沉默`,
-      `已经有人接了、话题在收尾`,
-      `单纯不想回、不感兴趣`,
-      ``,
-      `## 可以说话`,
-      `讨论你擅长的，有内容可补充`,
-      `有人提问你能答`,
-      `有人提到你`,
-      `群里氛围你能自然融入，群友聊什么语气你就用什么语气，别端着`,
-      `大家在复读，你感兴趣的话也能参与`,
-      ``,
-      `## 规则`,
-      `不说话 → 只回复 OFF（三个字母，别无其他）`,
-      `说话 → 直接回复，简短口语化，不超过 40 字`,
-    ]
-    return lines.join("\n")
-  }
-
-  /** 主动插话：非 @ 触发，LLM 自主决定是否参与群聊。
-   *  不走对话缓存、不带工具，回复不污染 conversation。 */
-  async _ambientTry(signal) {
-    const gid = String(this.e.group_id)
-    const cooldownKey = `${AMBIENT_KEY_PREFIX}:${gid}`
-
-    // Redis 冷却检查
-    const existing = await redis.get(cooldownKey)
-    if (existing) {
-      const remain = await redis.ttl(cooldownKey)
-      log.debug(`群 ${gid} 主动插话冷却中 (${remain}s)`)
-      return false
-    }
-
-    const ambient = cfg.aigc?.ambient || {}
-    const cooldownMin = (ambient.cooldown_min ?? 10) * 60
-    const cooldownMax = (ambient.cooldown_max ?? 20) * 60
-    const cooldown = cooldownMin + Math.floor(Math.random() * (cooldownMax - cooldownMin + 1))
-
-    const userMsg = this._getUserMsg()
-    if (!userMsg) return false
-
-    // 前缀过滤
-    const prefixFilter = cfg.aigc?.prefix_filter
-    if (prefixFilter?.length && prefixFilter.some(p => userMsg.startsWith(p))) {
-      return false
-    }
-
-    await redis.set(cooldownKey, "1", { EX: cooldown })
-    log.info(`群 ${gid} 主动插话判断中...`)
-
-    try {
-      const systemPrompt = this._buildAmbientPrompt()
-      const supplement = this._buildSupplement(true)
-      const envCtx = await this._buildEnvContext()
-      const fullSystem = [systemPrompt, supplement, envCtx].filter(Boolean).join("\n")
-
-      const messages = [
-        { role: "system", content: fullSystem },
-        { role: "user", content: userMsg },
-      ]
-
-      const opts = {}
-      if (signal) opts.signal = signal
-      if (ambient.model) opts.model = ambient.model
-      const res = await Bot.aigc.provider.chat(messages, opts)
-      const text = (res.content || "").trim()
-
-      if (!text || /^OFF$/i.test(text)) {
-        log.info(`群 ${gid} 主动插话: 跳过`)
-        return false
-      }
-
-      log.info(`群 ${gid} 主动插话: 回复`)
-      activeRequests.delete(this.e.user_id)
-      return this._sendReply(text, false)
-    } catch (err) {
-      log.warn(`群 ${gid} 主动插话异常: ${err.message}`)
-      return false
-    }
   }
 
   // AIGC 对话主流程
@@ -433,6 +405,8 @@ export class AigcFallback extends plugin {
       }
     }
 
+    let isAmbient = false
+
     if (this.e.isGroup) {
       const whitelist = cfg.aigc?.group_whitelist
       if (whitelist?.length) {
@@ -442,19 +416,24 @@ export class AigcFallback extends plugin {
 
       if (!this.e.atBot) {
         const ambient = cfg.aigc?.ambient
-        if (ambient?.enable) {
-          if (activeRequests.has(this.e.user_id)) return false
-          const ambController = new AbortController()
-          activeRequests.set(this.e.user_id, { controller: ambController, pendingMsg: "", pendingImg: [], pendingVideo: [] })
-          try {
-            return await this._ambientTry(ambController.signal)
-          } finally {
-            if (activeRequests.get(this.e.user_id)?.controller === ambController) {
-              activeRequests.delete(this.e.user_id)
-            }
-          }
+        if (!ambient?.enable) return false
+
+        const gid = String(this.e.group_id)
+        const cooldownKey = `${AMBIENT_KEY_PREFIX}:${gid}`
+        const existing = await redis.get(cooldownKey)
+        if (existing) {
+          const remain = await redis.ttl(cooldownKey)
+          log.debug(`群 ${gid} 主动插话冷却中 (${remain}s)`)
+          return false
         }
-        return false
+
+        const cooldownMin = (ambient.cooldown_min ?? 10) * 60
+        const cooldownMax = (ambient.cooldown_max ?? 20) * 60
+        const cooldown = cooldownMin + Math.floor(Math.random() * (cooldownMax - cooldownMin + 1))
+        await redis.set(cooldownKey, "1", { EX: cooldown })
+        log.info(`群 ${gid} 主动插话触发`)
+
+        isAmbient = true
       }
     }
 
@@ -486,7 +465,8 @@ export class AigcFallback extends plugin {
     const key = con().sessionKey(this.e.self_id, this.e.user_id)
     await con().addActiveUser(dateStr(), this.e.self_id, this.e.user_id)
 
-    log.info(`用户 ${this.e.user_id} 发起对话`)
+    const label = isAmbient ? "主动插话" : "对话"
+    log.info(`用户 ${this.e.user_id} 发起${label}`)
 
     try {
       const systemPrompt = await this._buildSystem(finalMsg)
@@ -499,9 +479,7 @@ export class AigcFallback extends plugin {
         log.info(`用户 ${this.e.user_id} 打断`)
         return false
       }
-      log.error(`对话异常: ${err.message}`)
-      // const code = err.code ? `，错误码 ${err.code}` : ""
-      // await this.reply(`请求失败${code}，请稍后重试`, true)
+      log.error(`${label}异常: ${err.message}`)
       await this.reply("我有些累了，请让我休息一会儿", true)
     } finally {
       if (activeRequests.get(this.e.user_id)?.controller === controller) {
@@ -510,49 +488,44 @@ export class AigcFallback extends plugin {
     }
   }
 
-  /** 构建 system prompt，MD 标题 + XML 标签格式 */
+  /** 构建 system prompt：提示词 + 记忆 + 环境 */
   async _buildSystem(userMsg) {
     const parts = []
 
-    const identity = this._buildIdentity()
-    if (identity) parts.push(identity)
+    // Gemma 4 系列：在 System Prompt 最前面自动注入 <|think|> token 以激活深度思考模式
+    const model = cfg.aigc?.gemini?.model || ""
+    if (/^gemma/i.test(model)) {
+      parts.push("<|think|>")
+    }
 
+    // 配置提示词
+    const prompt = cfg.aigc?.system_prompt || "你的名字叫云崽，一个智能助手。根据用户的提问提供有帮助的回答。"
+    parts.push(prompt)
     const supplement = this._buildSupplement()
     if (supplement) parts.push(supplement)
 
+    // 长期记忆
     const memories = await con().getMemories(this.e.self_id, this.e.user_id)
     if (memories) parts.push(`<user_memories>\n${memories}\n</user_memories>`)
 
+    // 对话环境
     const envCtx = await this._buildEnvContext()
     if (envCtx) parts.push(envCtx)
 
     return parts.join("\n")
   }
 
-  /** System Prompt */
-  _buildIdentity() {
-    const prompt = cfg.aigc?.system_prompt || "你的名字叫云崽，一个智能助手。根据用户的提问提供有帮助的回答。"
-    return `## System Prompt\n${prompt}`
-  }
-
   /** 系统补充信息 */
-  _buildSupplement(ambient = false) {
+  _buildSupplement() {
     const lines = []
 
     const timeStr = formatDate(new Date(), "full")
-    lines.push(`现在是${timeStr},请注意时间变化,回答时注意时效性,避免回答过时信息。`)
-
-    if (cfg.aigc?.split_reply) {
-      lines.push("一句话讲不完就<x>拆成多条发,模仿人类打一句话发一句话的习惯,最多允许一次拆3条。例如: 好的呀<x>那就给你瞧瞧我的本事吧！")
-      lines.push("注意不要连续使用一种拆法,因为没有人每次都发固定几条消息,所以要按实际所需拆分,不要每次都拆成3条,也不要每次都拆成2条,有时也可以不拆。")
-    }
-    if (!ambient) {
-      lines.push("如果不想回复,则直接输出 OFF 即可,不要做任何其他输出。")
-    }
-    return `\n${lines.join("\n")}\n`
+    lines.push(`现在是${timeStr}。`)
+    lines.push("如果不想或不需要回复,只需输出 no_reply 即可,不要输出其他内容。")
+    return lines.join("\n")
   }
 
-  /** 群聊/私聊信息 */
+  /** 群聊/私聊环境信息 */
   async _buildEnvContext() {
     const e = this.e
 
@@ -562,32 +535,34 @@ export class AigcFallback extends plugin {
         botCard = e.group?.pickMember?.(e.self_id)?.card || ""
       } catch {}
       const botName = botCard || Bot[e.self_id]?.nickname || ""
+      const botRole = (() => {
+        try {
+          const m = e.group?.pickMember?.(e.self_id)
+          return { owner: "群主", admin: "群管理员", member: "群成员" }[m?.role] || ""
+        } catch {
+          return ""
+        }
+      })()
 
       const card = e.sender?.card || e.sender?.nickname || ""
       const role = { owner: "群主", admin: "群管理员", member: "群成员" }[e.member?.role] || e.member?.role || "群成员"
 
       const lines = []
-      lines.push(`类型: 群聊`)
-      lines.push(`群名: ${e.group_name || "Unknown"} (ID: ${e.group_id})`)
-      lines.push(`你的群昵称: ${botName}`)
-      lines.push(`你的QQ: ${e.self_id}`)
-      lines.push(`你的头像: https://q.qlogo.cn/g?b=qq&s=0&nk=${e.self_id}`)
-      const avatar = e.sender?.getAvatarUrl?.() || e.member?.getAvatarUrl?.() || `https://q.qlogo.cn/g?b=qq&s=0&nk=${e.user_id}`
-      lines.push(`当前说话人: [${card}](QQ: ${e.user_id}, 群身份: ${role}, 头像: ${avatar})`)
-      lines.push(`备注: 群聊最近消息仅作为上下文供你参考,帮助你更好地理解当前对话环境,以便做出更合适的回答。`)
+      lines.push(`群信息: ${e.group_name || "Unknown"}(ID: ${e.group_id})`)
+      lines.push(`你的群信息: ${botName}(QQ: ${e.self_id}${botRole ? `, ${botRole}` : ""})`)
+      lines.push(`用户群信息: ${card}(QQ: ${e.user_id}, ${role})`)
 
       const histCount = cfg.aigc?.group_history_count ?? 30
       if (histCount > 0) {
         const history = await this._getGroupHistory(histCount)
-        if (history) lines.push(`  <group_history>\n${history}\n  </group_history>`)
+        if (history) lines.push(`<group_history>\n${history}\n</group_history>`)
       }
 
       return `<chat_context>\n${lines.join("\n")}\n</chat_context>`
     }
 
     const name = e.sender?.nickname || "Unknown"
-    const avatar = e.sender?.getAvatarUrl?.() || `https://q.qlogo.cn/g?b=qq&s=0&nk=${e.user_id}`
-    return `<chat_context>\n类型: 私聊\n你的QQ: ${e.self_id}\n你的头像: https://q.qlogo.cn/g?b=qq&s=0&nk=${e.self_id}\n用户: [${name}](QQ: ${e.user_id}, 头像: ${avatar})\n</chat_context>`
+    return `<chat_context>\n用户信息: ${name}(QQ: ${e.user_id})\n</chat_context>`
   }
 
   /** 获取群聊最近 N 条消息 */
@@ -607,18 +582,12 @@ export class AigcFallback extends plugin {
         const sender = msg.sender || {}
         const name = sender.card || sender.nickname || "Unknown"
         const qq = sender.user_id || "?"
-        const role = { owner: "群主", admin: "群管理员", member: "群成员" }[sender.role] || sender.role || "群成员"
-        let time = ""
-        if (msg.time) {
-          const d = new Date(msg.time * 1000)
-          const pad = n => String(n).padStart(2, "0")
-          time = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-        }
+        const role = { owner: "群主", admin: "群管理员" }[sender.role] || ""
 
         const text = this._extractMsgText(msg)
         if (!text) continue
 
-        lines.push(`    ${time ? `[${time}] ` : ""}[${name}](QQ: ${qq}, ${role}): ${text}`)
+        lines.push(`${name}(QQ: ${qq}${role ? `, ${role}` : ""}): ${text}`)
       }
 
       return lines.length ? lines.join("\n") : null
@@ -671,20 +640,6 @@ export class AigcFallback extends plugin {
     return parts.join("").trim()
   }
 
-  /** 发送回复：检查语音标识 → 若开启则转语音，否则纯文本 */
-  async _sendReply(text, quote = true) {
-    try {
-      const emo_switch = await Bot.aigc.voice.consume(this.e.user_id)
-      if (emo_switch) {
-        const audioUrl = await Bot.aigc.voice.tts(text, emo_switch)
-        return this.e.reply(segment.record(audioUrl))
-      }
-    } catch (err) {
-      log.error(`语音转换失败，降级为文本: ${err.message}`)
-    }
-    return this._splitReply(text, quote)
-  }
-
   /** 从 provider 响应构建待持久化的 assistant 消息 */
   _buildAssistantMsg(res) {
     return {
@@ -710,39 +665,88 @@ export class AigcFallback extends plugin {
   }
 
   /** 工具调用循环：LLM 回复 → tool_calls 则执行并回传 → 文本则发送并退出。
-   *  整轮对话在内存中累积，最终回复生成后才原子写入缓存，避免中途死机留下残缺记录。 */
+   *  采用 "API 增量请求，本地全量累积" 架构：
+   *  - localPending[]  最终原子写入 LevelDB 的完整对话记录
+   *  - apiMessages[]   每轮实际发送给 API 的消息
+   *  有状态模式：通过 previous_interaction_id 让服务端管理上下文。 */
   async _replyLoop(sessionKey, userMsg, images, videos, systemPrompt, signal) {
+    const stateful = cfg.aigc?.gemini?.stateful ?? true
     const rawHistory = await con().getMessages(this.e.self_id, this.e.user_id)
     const baseMessages = rawHistory.filter(m => m.role !== "system")
     const systemMsg = { role: "system", content: systemPrompt }
-    const pending = []
-    let userPushed = false
 
+    // 本地全量记录 — 本方法结束时原子写入 LevelDB
+    const localPending = []
+
+    // 用户消息始终排在本地记录首位
+    const firstUserMsg = {
+      role: "user",
+      content: userMsg,
+      ...this._userMsgMeta(),
+      ...(images ? { images } : {}),
+      ...(videos ? { videos } : {}),
+    }
+    localPending.push(firstUserMsg)
+
+    let prevIactId = stateful ? await con().getInteractionId(this.e.self_id, this.e.user_id) : null
     const maxRounds = getMaxToolRounds()
+
     for (let round = 0; round < maxRounds; round++) {
-      const messages = [systemMsg, ...baseMessages, ...pending]
-      if (!userPushed) {
-        const um = { role: "user", content: userMsg }
-        if (images) um.images = images
-        if (videos) um.videos = videos
-        messages.push(um)
+      // 构建本轮 API 请求的消息
+      let apiMessages
+      if (round === 0) {
+        // 有状态+已有上下文 → 仅发增量；否则带历史
+        apiMessages = stateful && prevIactId ? [systemMsg, firstUserMsg] : [systemMsg, ...baseMessages, firstUserMsg]
+      } else {
+        // 后续工具轮：有状态 → 仅发送未发送过的 tool 结果
+        //            无状态 → 发送完整历史 + 本轮累积
+        const unsentTools = localPending.filter(m => m.role === "tool" && !m._sent)
+        apiMessages = stateful && prevIactId ? [systemMsg, ...unsentTools] : [systemMsg, ...baseMessages, ...localPending]
+        // 标记这些 tool 消息为已发送，下轮不再重复
+        for (const m of unsentTools) m._sent = true
       }
 
-      const opts = {}
-      if (signal) opts.signal = signal
-      const toolDefs = tools().getDefinitions()
-      if (toolDefs.length) {
-        opts.tools = toolDefs
-        opts.tool_choice = "auto"
+      const opts = {
+        signal,
+        stateful,
+        tools: tools().getDefinitions(),
+        tool_choice: "auto",
+      }
+      if (stateful && prevIactId) {
+        opts.previous_interaction_id = prevIactId
       }
 
-      const res = await Bot.aigc.provider.chat(messages, opts)
+      let res
+      try {
+        res = await Bot.aigc.provider.chat(apiMessages, opts)
+      } catch (err) {
+        // 有状态模式下 interaction_id 过期 → 清理缓存，带完整历史降级重试
+        if (err?.code === "SESSION_EXPIRED" && stateful && prevIactId) {
+          log.warn(`Interaction ID 过期，清理本地缓存并使用全量历史重试`)
+          await con().clearInteractionId(this.e.self_id, this.e.user_id)
+          prevIactId = null
+          delete opts.previous_interaction_id
+          apiMessages = round === 0 ? [systemMsg, ...baseMessages, firstUserMsg] : [systemMsg, ...baseMessages, ...localPending]
+          res = await Bot.aigc.provider.chat(apiMessages, opts)
+        } else {
+          throw err
+        }
+      }
+
+      // 滚动更新交互 ID
+      if (stateful && res.interaction_id) {
+        prevIactId = res.interaction_id
+      }
 
       if (res.blocked) {
         log.warn(`安全拦截  ${res.finishReason}`)
         return this.reply("内容被安全策略拦截", true)
       }
 
+      const assistantMsg = this._buildAssistantMsg(res)
+      localPending.push(assistantMsg)
+
+      // 工具调用
       if (res.tool_calls?.length) {
         if (res.content) await this._sendReply(res.content, false)
 
@@ -752,18 +756,6 @@ export class AigcFallback extends plugin {
           .join(",")
         log.info(`调用工具: ${names}`)
 
-        if (!userPushed) {
-          pending.push({
-            role: "user",
-            content: userMsg,
-            ...this._userMsgMeta(),
-            ...(images ? { images } : {}),
-            ...(videos ? { videos } : {}),
-          })
-          userPushed = true
-        }
-        pending.push(this._buildAssistantMsg(res))
-
         const ctx = { user_id: this.e.user_id, event: this.e, signal }
         if (signal?.aborted) throw new DOMException("Aborted", "AbortError")
         const results = await Promise.all(
@@ -771,11 +763,7 @@ export class AigcFallback extends plugin {
             if (signal?.aborted) return { name: tc?.function?.name || "unknown", error: "Aborted" }
             try {
               const fnName = tc?.function?.name
-              if (!fnName)
-                return {
-                  name: "unknown",
-                  error: "tool_calls missing function.name",
-                }
+              if (!fnName) return { name: "unknown", error: "tool_calls missing function.name" }
               let args = {}
               try {
                 args = JSON.parse(tc?.function?.arguments || "{}")
@@ -785,75 +773,73 @@ export class AigcFallback extends plugin {
               if (!args || typeof args !== "object") args = {}
               return await tools().execute(fnName, args, ctx)
             } catch (err) {
-              return {
-                name: tc?.function?.name || "unknown",
-                error: err?.message || String(err),
-              }
+              return { name: tc?.function?.name || "unknown", error: err?.message || String(err) }
             }
           }),
         )
+
         const lastRound = round === maxRounds - 1
         for (let i = 0; i < results.length; i++) {
           const r = results[i]
           const callId = res.tool_calls[i]?.id || `call_${i}`
           const payload = "error" in r ? r.error : r.result
-          let content, images, videos
+          let tContent, tImages, tVideos
           if (payload && typeof payload === "object") {
             if (Array.isArray(payload.images)) {
-              images = payload.images
-              content = payload.text || "图片获取成功"
+              tImages = payload.images
+              tContent = payload.text || "图片获取成功"
             }
             if (Array.isArray(payload.videos)) {
-              videos = payload.videos
-              content = payload.text || "视频获取成功"
+              tVideos = payload.videos
+              tContent = payload.text || "视频获取成功"
             }
           }
-          if (!content) {
-            content = typeof payload === "string" ? payload : JSON.stringify(payload ?? "")
+          if (!tContent) {
+            tContent = typeof payload === "string" ? payload : JSON.stringify(payload ?? "")
           }
           if (lastRound && i === results.length - 1) {
-            content += `\n\n[系统提示] 你已达到最大工具调用轮次 (${maxRounds}轮)。请立即基于已获取的所有信息回复用户，不要再调用任何工具！！！如果信息不足，如实说明已掌握的情况即可。`
+            tContent += `\n\n[系统提示] 你已达到最大工具调用轮次 (${maxRounds}轮)。请立即基于已获取的所有信息回复用户，不要再调用任何工具！！！如果信息不足，如实说明已掌握的情况即可。`
           }
-          pending.push({
+          localPending.push({
             role: "tool",
-            content,
+            content: tContent,
             tool_call_id: callId,
-            ...(images?.length ? { images } : {}),
-            ...(videos?.length ? { videos } : {}),
+            name: res.tool_calls[i]?.function?.name,
+            _sent: false,
+            ...(tImages?.length ? { images: tImages } : {}),
+            ...(tVideos?.length ? { videos: tVideos } : {}),
           })
         }
         continue
       }
 
+      // 文本回复
       if (res.content) {
         const text = (res.content || "").trim()
-        if (!text || /^OFF$/i.test(text)) {
-          if (!userPushed) return false
-          for (const m of pending) {
+
+        // no_reply: 不发送回复，但完整落盘保留对话结构
+        if (!text || /^no_reply$/i.test(text)) {
+          for (const m of localPending) {
+            delete m._sent
             if (m.videos?.length) m.content = (m.content || "").replace(/\[视频\]/g, "[视频已过期]")
             delete m.videos
           }
-          await con().appendMessages(sessionKey, pending)
+          await con().appendMessages(sessionKey, localPending)
+          if (stateful && prevIactId) await con().setInteractionId(this.e.self_id, this.e.user_id, prevIactId)
           return false
         }
 
-        if (!userPushed) {
-          pending.push({
-            role: "user",
-            content: userMsg,
-            ...this._userMsgMeta(),
-            ...(images ? { images } : {}),
-            ...(videos ? { videos } : {}),
-          })
-          userPushed = true
-        }
-        pending.push(this._buildAssistantMsg(res))
+        // 解析 XML 标签
+        const taggedParts = this._parseTaggedReply(text)
 
-        for (const m of pending) {
+        // 落盘前清理临时标记和过期视频
+        for (const m of localPending) {
+          delete m._sent
           if (m.videos?.length) m.content = (m.content || "").replace(/\[视频\]/g, "[视频已过期]")
           delete m.videos
         }
-        await con().appendMessages(sessionKey, pending)
+        await con().appendMessages(sessionKey, localPending)
+        if (stateful && prevIactId) await con().setInteractionId(this.e.self_id, this.e.user_id, prevIactId)
 
         if (res.reasoning_content && cfg.aigc?.show_thinking) {
           const thinkingMsg = await common.makeForwardMsg(this.e, [{ type: "text", data: { text: res.reasoning_content } }])
@@ -861,7 +847,7 @@ export class AigcFallback extends plugin {
         }
 
         activeRequests.delete(this.e.user_id)
-        return this._sendReply(res.content)
+        return taggedParts.length ? this._sendTaggedReply(taggedParts) : this._sendReply(res.content)
       }
 
       log.warn(`空响应`)
@@ -869,41 +855,52 @@ export class AigcFallback extends plugin {
     }
 
     // 工具轮次用尽：tool_choice="none" 强制文本回复
-    if (!userPushed) {
-      pending.push({
-        role: "user",
-        content: userMsg,
-        ...this._userMsgMeta(),
-        ...(images ? { images } : {}),
-        ...(videos ? { videos } : {}),
-      })
-      userPushed = true
+    const unsentTools = localPending.filter(m => m.role === "tool" && !m._sent)
+    const finalMessages = stateful && prevIactId ? [systemMsg, ...unsentTools] : [systemMsg, ...baseMessages, ...localPending]
+    for (const m of unsentTools) m._sent = true
+
+    const finalOpts = { signal, stateful, tool_choice: "none" }
+    if (stateful && prevIactId) {
+      finalOpts.previous_interaction_id = prevIactId
     }
-    const finalMessages = [systemMsg, ...baseMessages, ...pending]
-    const finalOpts = {}
-    if (signal) finalOpts.signal = signal
     const finalToolDefs = tools().getDefinitions()
-    if (finalToolDefs.length) {
-      finalOpts.tools = finalToolDefs
-      finalOpts.tool_choice = "none"
-    }
+    if (finalToolDefs.length) finalOpts.tools = finalToolDefs
+
     const finalReply = await Bot.aigc.provider.chat(finalMessages, finalOpts)
 
-    // 纯文本回复，正常保存并发送
+    if (stateful && finalReply.interaction_id) {
+      prevIactId = finalReply.interaction_id
+    }
+
     if (finalReply.content) {
-      pending.push(this._buildAssistantMsg(finalReply))
-      for (const m of pending) {
+      const finalText = (finalReply.content || "").trim()
+
+      // no_reply: 不发送回复，但完整落盘
+      if (!finalText || /^no_reply$/i.test(finalText)) {
+        for (const m of localPending) {
+          delete m._sent
+          if (m.videos?.length) m.content = (m.content || "").replace(/\[视频\]/g, "[视频已过期]")
+          delete m.videos
+        }
+        await con().appendMessages(sessionKey, localPending)
+        if (stateful && prevIactId) await con().setInteractionId(this.e.self_id, this.e.user_id, prevIactId)
+        return false
+      }
+
+      const taggedParts = this._parseTaggedReply(finalText)
+      localPending.push(this._buildAssistantMsg(finalReply))
+      for (const m of localPending) {
+        delete m._sent
         if (m.videos?.length) m.content = (m.content || "").replace(/\[视频\]/g, "[视频已过期]")
         delete m.videos
       }
-      await con().appendMessages(sessionKey, pending)
+      await con().appendMessages(sessionKey, localPending)
+      if (stateful && prevIactId) await con().setInteractionId(this.e.self_id, this.e.user_id, prevIactId)
       log.warn(`工具轮次超限，降级回复成功`)
       activeRequests.delete(this.e.user_id)
-      return this._sendReply(finalReply.content)
+      return taggedParts.length ? this._sendTaggedReply(taggedParts) : this._sendReply(finalReply.content)
     }
     log.error(`全部失败`)
-    // return this.reply("请求失败，请稍后再试", true)
-    const fallbackMsg = ["脑子彻底转不动了…晚点再试试吧~", "信号完全丢失了，稍等一下再来？", "今天状态不太好，一会儿再找我聊？", "唔…好像卡住了，晚点再试试吧！"][Math.floor(Math.random() * 4)]
-    return this.reply(fallbackMsg, true)
+    return this.reply("请求失败", true)
   }
 }

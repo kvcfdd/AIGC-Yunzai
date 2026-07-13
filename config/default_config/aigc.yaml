@@ -6,7 +6,8 @@ gemini:
   endpoint: https://generativelanguage.googleapis.com # 可替换为兼容 Google Gemini API 的反代地址
   api_key: "" # 多 Key 用英文逗号分隔，如 "xxx,yyy"
   model: gemini-3.5-flash # 模型
-  thinking_level: minimal # 思考等级 minimal, low, medium, high
+  stateful: true # 有状态模式：服务端管理上下文
+  thinking_level: medium # 思考等级 minimal, low, medium, high
 
 # 输出最大长度
 max_tokens: 4096
@@ -66,8 +67,6 @@ prefix_filter:
 group_history_count: 30
 # 是否将思维链以合并转发方式单独发送
 show_thinking: false
-# 是否允许分句回复
-split_reply: false
 
 # B站 Cookie（用于视频搜索和下载，不填则使用匿名会话）
 bilibili_cookie: ""
