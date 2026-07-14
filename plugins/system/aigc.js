@@ -367,7 +367,7 @@ export class AigcFallback extends plugin {
       if (seg.type === "text") {
         parts.push(seg.text || "")
       } else if (seg.type === "at") {
-        if (seg.qq == this.e.self_id) continue
+        // if (seg.qq == this.e.self_id) continue
         parts.push(`@${this._resolveAtName(seg.qq)}`)
       } else if (seg.type === "image") {
         parts.push("[图片]")
