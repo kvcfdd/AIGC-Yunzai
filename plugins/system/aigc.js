@@ -235,17 +235,8 @@ export class AigcFallback extends plugin {
     return parts
   }
 
-  /** 发送回复：检查语音标识 → 若开启则转语音，否则纯文本 */
+  /** 发送纯文本回复 */
   async _sendReply(text, quote = true) {
-    try {
-      const emo_switch = await Bot.aigc.voice.consume(this.e.user_id)
-      if (emo_switch) {
-        const audioUrl = await Bot.aigc.voice.tts(text, emo_switch)
-        return this.e.reply(segment.record(audioUrl))
-      }
-    } catch (err) {
-      log.error(`语音转换失败，降级为文本: ${err.message}`)
-    }
     return this.reply(text, quote)
   }
 
@@ -263,7 +254,6 @@ export class AigcFallback extends plugin {
 
   /** 处理带标签的回复：<reply> 发文本，<voice> 转语音，支持混排多条 */
   async _sendTaggedReply(parts, quote = true) {
-    const emo_switch = await Bot.aigc.voice.consume(this.e.user_id).catch(() => null)
     for (let i = 0; i < parts.length; i++) {
       const { type, text } = parts[i]
       if (!text) continue
@@ -271,7 +261,7 @@ export class AigcFallback extends plugin {
         try {
           const vcfg = cfg.aigc?.voice || {}
           if (vcfg.api_key && vcfg.voice_id) {
-            const audioUrl = await Bot.aigc.voice.tts(text, emo_switch)
+            const audioUrl = await Bot.aigc.voice.tts(text)
             await this.e.reply(segment.record(audioUrl))
           } else {
             await this.reply(text, i === 0 && quote)
@@ -650,7 +640,6 @@ export class AigcFallback extends plugin {
         reasoning_content: res.reasoning_content,
       }),
       ...(res.reasoning_parts && { reasoning_parts: res.reasoning_parts }),
-      ...(res.content_parts && { content_parts: res.content_parts }),
     }
   }
 
@@ -688,7 +677,13 @@ export class AigcFallback extends plugin {
     }
     localPending.push(firstUserMsg)
 
-    let prevIactId = stateful ? await con().getInteractionId(this.e.self_id, this.e.user_id) : null
+    let prevIactId
+    if (stateful) {
+      prevIactId = await con().getInteractionId(this.e.self_id, this.e.user_id)
+    } else {
+      await con().clearInteractionId(this.e.self_id, this.e.user_id)
+      prevIactId = null
+    }
     const maxRounds = getMaxToolRounds()
 
     for (let round = 0; round < maxRounds; round++) {
@@ -782,6 +777,7 @@ export class AigcFallback extends plugin {
         for (let i = 0; i < results.length; i++) {
           const r = results[i]
           const callId = res.tool_calls[i]?.id || `call_${i}`
+          const callSig = res.tool_calls[i]?.signature || null
           const payload = "error" in r ? r.error : r.result
           let tContent, tImages, tVideos
           if (payload && typeof payload === "object") {
@@ -805,6 +801,7 @@ export class AigcFallback extends plugin {
             content: tContent,
             tool_call_id: callId,
             name: res.tool_calls[i]?.function?.name,
+            signature: callSig,
             _sent: false,
             ...(tImages?.length ? { images: tImages } : {}),
             ...(tVideos?.length ? { videos: tVideos } : {}),
