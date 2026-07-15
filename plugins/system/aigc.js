@@ -511,7 +511,7 @@ export class AigcFallback extends plugin {
 
     const timeStr = formatDate(new Date(), "full")
     lines.push(`现在是${timeStr}。`)
-    lines.push("如果不想或不需要回复,只需输出 no_reply 即可,不要输出其他内容。")
+    lines.push("如果不需要回复,只需要输出 no_reply 即可,不要输出多余内容,包括标点符号和空格。")
     return lines.join("\n")
   }
 
@@ -577,7 +577,7 @@ export class AigcFallback extends plugin {
         const text = this._extractMsgText(msg)
         if (!text) continue
 
-        lines.push(`${name}(QQ: ${qq}${role ? `, ${role}` : ""}): ${text}`)
+        lines.push(`[${name}](QQ: ${qq}${role ? `, ${role}` : ""}): ${text}`)
       }
 
       return lines.length ? lines.join("\n") : null
@@ -615,8 +615,8 @@ export class AigcFallback extends plugin {
         parts.push(url ? `[视频](${url})` : "[视频]")
       } else if (seg.type === "record" || seg.type === "audio") {
         parts.push("[语音]")
-      } else if (seg.type === "reply") {
-        parts.push("[引用]")
+      // } else if (seg.type === "reply") {
+      //   parts.push("[引用]")
       } else if (seg.type === "json") {
         const data = typeof seg.data === "string" ? JSON.parse(seg.data) : seg.data || {}
         const meta = data?.meta?.detail_1 || data?.meta?.detail || data
