@@ -408,6 +408,9 @@ export class AigcFallback extends plugin {
         const ambient = cfg.aigc?.ambient
         if (!ambient?.enable) return false
 
+        // 该用户已有进行中的请求 → 不触发插话，避免打断正常对话
+        if (activeRequests.has(this.e.user_id)) return false
+
         const gid = String(this.e.group_id)
         const cooldownKey = `${AMBIENT_KEY_PREFIX}:${gid}`
         const existing = await redis.get(cooldownKey)
@@ -441,29 +444,37 @@ export class AigcFallback extends plugin {
     const existing = activeRequests.get(this.e.user_id)
     if (existing) {
       existing.controller.abort()
-      finalMsg = existing.pendingMsg ? existing.pendingMsg + "\n" + userMsg : userMsg
-      if (existing.pendingImg?.length) {
-        finalImg = [...existing.pendingImg, ...finalImg]
-      }
-      if (existing.pendingVideo?.length) {
-        finalVideo = [...existing.pendingVideo, ...finalVideo]
+      if (existing.isAmbient) {
+        log.info(`用户 ${this.e.user_id} 切换到at对话`)
+      } else {
+        finalMsg = existing.pendingMsg ? existing.pendingMsg + "\n" + userMsg : userMsg
+        if (existing.pendingImg?.length) {
+          finalImg = [...existing.pendingImg, ...finalImg]
+        }
+        if (existing.pendingVideo?.length) {
+          finalVideo = [...existing.pendingVideo, ...finalVideo]
+        }
       }
     }
     const controller = new AbortController()
-    activeRequests.set(this.e.user_id, { controller, pendingMsg: finalMsg, pendingImg: finalImg, pendingVideo: finalVideo })
+    activeRequests.set(this.e.user_id, { controller, isAmbient, pendingMsg: finalMsg, pendingImg: finalImg, pendingVideo: finalVideo })
 
     const key = con().sessionKey(this.e.self_id, this.e.user_id)
-    await con().addActiveUser(dateStr(), this.e.self_id, this.e.user_id)
+    // 主动插话不落盘，不计入当日活跃用户
+    if (!isAmbient) await con().addActiveUser(dateStr(), this.e.self_id, this.e.user_id)
 
     const label = isAmbient ? "主动插话" : "对话"
     log.info(`用户 ${this.e.user_id} 发起${label}`)
 
+    // 分流模型，影响模型族条件行为
+    const effectiveModel = isAmbient && cfg.aigc?.ambient?.model ? cfg.aigc.ambient.model : cfg.aigc?.gemini?.model || ""
+
     try {
-      const systemPrompt = await this._buildSystem(finalMsg)
+      const systemPrompt = await this._buildSystem(finalMsg, effectiveModel)
       const images = await Bot.aigc.provider.resolveImages(finalImg)
-      const removeAudio = /^gemma/i.test(cfg.aigc?.gemini?.model || "")
+      const removeAudio = /^gemma/i.test(effectiveModel)
       const videos = await Bot.aigc.provider.resolveVideo(finalVideo, removeAudio, controller.signal)
-      await this._replyLoop(key, finalMsg, images, videos, systemPrompt, controller.signal)
+      await this._replyLoop(key, finalMsg, images, videos, systemPrompt, controller.signal, isAmbient)
     } catch (err) {
       if (err?.name === "AbortError") {
         log.info(`用户 ${this.e.user_id} 打断`)
@@ -478,12 +489,13 @@ export class AigcFallback extends plugin {
     }
   }
 
-  /** 构建 system prompt：提示词 + 记忆 + 环境 */
-  async _buildSystem(userMsg) {
+  /** 构建 system prompt：提示词 + 记忆 + 环境
+   *  @param effectiveModel 实际生效模型，用于模型族条件判断 */
+  async _buildSystem(userMsg, effectiveModel = "") {
     const parts = []
 
     // Gemma 4 系列：在 System Prompt 最前面自动注入 <|think|> token 以激活深度思考模式
-    const model = cfg.aigc?.gemini?.model || ""
+    const model = effectiveModel || cfg.aigc?.gemini?.model || ""
     if (/^gemma/i.test(model)) {
       parts.push("<|think|>")
     }
@@ -615,8 +627,8 @@ export class AigcFallback extends plugin {
         parts.push(url ? `[视频](${url})` : "[视频]")
       } else if (seg.type === "record" || seg.type === "audio") {
         parts.push("[语音]")
-      // } else if (seg.type === "reply") {
-      //   parts.push("[引用]")
+        // } else if (seg.type === "reply") {
+        //   parts.push("[引用]")
       } else if (seg.type === "json") {
         const data = typeof seg.data === "string" ? JSON.parse(seg.data) : seg.data || {}
         const meta = data?.meta?.detail_1 || data?.meta?.detail || data
@@ -653,13 +665,28 @@ export class AigcFallback extends plugin {
     return meta
   }
 
+  /** 清理临时标记/过期视频后原子落盘本轮对话，并更新交互 ID
+   *  isAmbient 为 true 时直接不落盘 */
+  async _persistRound(sessionKey, localPending, stateful, prevIactId, isAmbient = false) {
+    if (isAmbient) return
+    for (const m of localPending) {
+      delete m._sent
+      if (m.videos?.length) m.content = (m.content || "").replace(/\[视频\]/g, "[视频已过期]")
+      delete m.videos
+    }
+    await con().appendMessages(sessionKey, localPending)
+    if (stateful && prevIactId) await con().setInteractionId(this.e.self_id, this.e.user_id, prevIactId)
+  }
+
   /** 工具调用循环：LLM 回复 → tool_calls 则执行并回传 → 文本则发送并退出。
    *  采用 "API 增量请求，本地全量累积" 架构：
    *  - localPending[]  最终原子写入 LevelDB 的完整对话记录
    *  - apiMessages[]   每轮实际发送给 API 的消息
-   *  有状态模式：通过 previous_interaction_id 让服务端管理上下文。 */
-  async _replyLoop(sessionKey, userMsg, images, videos, systemPrompt, signal) {
-    const stateful = cfg.aigc?.gemini?.stateful ?? true
+   *  有状态模式：通过 previous_interaction_id 让服务端管理上下文。
+   *  主动插话：固定无状态 + ambient.model 分流，可用工具/记忆/上下文，但整轮不落盘。 */
+  async _replyLoop(sessionKey, userMsg, images, videos, systemPrompt, signal, isAmbient = false) {
+    const stateful = isAmbient ? false : (cfg.aigc?.gemini?.stateful ?? true)
+    const ambientModel = (isAmbient && cfg.aigc?.ambient?.model) || undefined
     const rawHistory = await con().getMessages(this.e.self_id, this.e.user_id)
     const baseMessages = rawHistory.filter(m => m.role !== "system")
     const systemMsg = { role: "system", content: systemPrompt }
@@ -681,7 +708,8 @@ export class AigcFallback extends plugin {
     if (stateful) {
       prevIactId = await con().getInteractionId(this.e.self_id, this.e.user_id)
     } else {
-      await con().clearInteractionId(this.e.self_id, this.e.user_id)
+      // 主动插话是临时无状态请求，不清理正常对话的交互 ID
+      if (!isAmbient) await con().clearInteractionId(this.e.self_id, this.e.user_id)
       prevIactId = null
     }
     const maxRounds = getMaxToolRounds()
@@ -707,6 +735,7 @@ export class AigcFallback extends plugin {
         tools: tools().getDefinitions(),
         tool_choice: "auto",
       }
+      if (ambientModel) opts.model = ambientModel
       if (stateful && prevIactId) {
         opts.previous_interaction_id = prevIactId
       }
@@ -816,27 +845,18 @@ export class AigcFallback extends plugin {
 
         // no_reply: 不发送回复，但完整落盘保留对话结构
         if (!text || /^no_reply$/i.test(text)) {
-          for (const m of localPending) {
-            delete m._sent
-            if (m.videos?.length) m.content = (m.content || "").replace(/\[视频\]/g, "[视频已过期]")
-            delete m.videos
-          }
-          await con().appendMessages(sessionKey, localPending)
-          if (stateful && prevIactId) await con().setInteractionId(this.e.self_id, this.e.user_id, prevIactId)
+          await this._persistRound(sessionKey, localPending, stateful, prevIactId, isAmbient)
           return false
         }
 
         // 解析 XML 标签
         const taggedParts = this._parseTaggedReply(text)
 
-        // 落盘前清理临时标记和过期视频
-        for (const m of localPending) {
-          delete m._sent
-          if (m.videos?.length) m.content = (m.content || "").replace(/\[视频\]/g, "[视频已过期]")
-          delete m.videos
-        }
-        await con().appendMessages(sessionKey, localPending)
-        if (stateful && prevIactId) await con().setInteractionId(this.e.self_id, this.e.user_id, prevIactId)
+        // 落盘
+        await this._persistRound(sessionKey, localPending, stateful, prevIactId, isAmbient)
+
+        // 期间被新请求打断→ 不再发送本次回复
+        if (signal?.aborted) throw new DOMException("Aborted", "AbortError")
 
         if (res.reasoning_content && cfg.aigc?.show_thinking) {
           const thinkingMsg = await common.makeForwardMsg(this.e, [{ type: "text", data: { text: res.reasoning_content } }])
@@ -857,6 +877,7 @@ export class AigcFallback extends plugin {
     for (const m of unsentTools) m._sent = true
 
     const finalOpts = { signal, stateful, tool_choice: "none" }
+    if (ambientModel) finalOpts.model = ambientModel
     if (stateful && prevIactId) {
       finalOpts.previous_interaction_id = prevIactId
     }
@@ -874,25 +895,14 @@ export class AigcFallback extends plugin {
 
       // no_reply: 不发送回复，但完整落盘
       if (!finalText || /^no_reply$/i.test(finalText)) {
-        for (const m of localPending) {
-          delete m._sent
-          if (m.videos?.length) m.content = (m.content || "").replace(/\[视频\]/g, "[视频已过期]")
-          delete m.videos
-        }
-        await con().appendMessages(sessionKey, localPending)
-        if (stateful && prevIactId) await con().setInteractionId(this.e.self_id, this.e.user_id, prevIactId)
+        await this._persistRound(sessionKey, localPending, stateful, prevIactId, isAmbient)
         return false
       }
 
       const taggedParts = this._parseTaggedReply(finalText)
       localPending.push(this._buildAssistantMsg(finalReply))
-      for (const m of localPending) {
-        delete m._sent
-        if (m.videos?.length) m.content = (m.content || "").replace(/\[视频\]/g, "[视频已过期]")
-        delete m.videos
-      }
-      await con().appendMessages(sessionKey, localPending)
-      if (stateful && prevIactId) await con().setInteractionId(this.e.self_id, this.e.user_id, prevIactId)
+      await this._persistRound(sessionKey, localPending, stateful, prevIactId, isAmbient)
+      if (signal?.aborted) throw new DOMException("Aborted", "AbortError")
       log.warn(`工具轮次超限，降级回复成功`)
       activeRequests.delete(this.e.user_id)
       return taggedParts.length ? this._sendTaggedReply(taggedParts) : this._sendReply(finalReply.content)

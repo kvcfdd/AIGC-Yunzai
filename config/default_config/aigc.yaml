@@ -6,7 +6,7 @@ gemini:
   endpoint: https://generativelanguage.googleapis.com # 可替换为兼容 Google Gemini API 的反代地址
   api_key: "" # 多 Key 用英文逗号分隔，如 "xxx,yyy"
   model: gemini-3.5-flash # 模型
-  stateful: true # 有状态模式：服务端管理上下文
+  stateful: false # 有状态模式：服务端管理上下文
   thinking_level: medium # 思考等级 minimal, low, medium, high
 
 # 输出最大长度
@@ -75,7 +75,7 @@ ambient:
   enable: false # 是否启用
   cooldown_min: 30 # 最小冷却，单位分钟
   cooldown_max: 60 # 最大冷却，单位分钟
-  model: "" # 分流模型，留空走全局
+  model: "" # 分流模型(非主动at对话外使用的模型)，留空走全局
 
 # 语音合成 (悟声 Wusound TTS)
 voice:
