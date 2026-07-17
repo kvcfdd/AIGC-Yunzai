@@ -254,6 +254,7 @@ export class AigcFallback extends plugin {
 
   /** 处理带标签的回复：<reply> 发文本，<voice> 转语音，支持混排多条 */
   async _sendTaggedReply(parts, quote = true) {
+    let quoted = false
     for (let i = 0; i < parts.length; i++) {
       const { type, text } = parts[i]
       if (!text) continue
@@ -264,14 +265,20 @@ export class AigcFallback extends plugin {
             const audioUrl = await Bot.aigc.voice.tts(text)
             await this.e.reply(segment.record(audioUrl))
           } else {
-            await this.reply(text, i === 0 && quote)
+            const shouldQuote = !quoted && quote
+            await this.reply(text, shouldQuote)
+            quoted = true
           }
         } catch (err) {
           log.error(`语音转换失败，降级为文本: ${err.message}`)
-          await this.reply(text, i === 0 && quote)
+          const shouldQuote = !quoted && quote
+          await this.reply(text, shouldQuote)
+          quoted = true
         }
       } else {
-        await this.reply(text, i === 0 && quote)
+        const shouldQuote = !quoted && quote
+        await this.reply(text, shouldQuote)
+        quoted = true
       }
       if (i < parts.length - 1) await new Promise(r => setTimeout(r, Math.random() * 1000 + 1000))
     }
@@ -687,6 +694,7 @@ export class AigcFallback extends plugin {
   async _replyLoop(sessionKey, userMsg, images, videos, systemPrompt, signal, isAmbient = false) {
     const stateful = isAmbient ? false : (cfg.aigc?.gemini?.stateful ?? true)
     const ambientModel = (isAmbient && cfg.aigc?.ambient?.model) || undefined
+    const replyQuote = !isAmbient // 插话不引用，at 对话引用
     const rawHistory = await con().getMessages(this.e.self_id, this.e.user_id)
     const baseMessages = rawHistory.filter(m => m.role !== "system")
     const systemMsg = { role: "system", content: systemPrompt }
@@ -864,7 +872,7 @@ export class AigcFallback extends plugin {
         }
 
         activeRequests.delete(this.e.user_id)
-        return taggedParts.length ? this._sendTaggedReply(taggedParts) : this._sendReply(res.content)
+        return taggedParts.length ? this._sendTaggedReply(taggedParts, replyQuote) : this._sendReply(res.content, replyQuote)
       }
 
       log.warn(`空响应`)
@@ -905,7 +913,7 @@ export class AigcFallback extends plugin {
       if (signal?.aborted) throw new DOMException("Aborted", "AbortError")
       log.warn(`工具轮次超限，降级回复成功`)
       activeRequests.delete(this.e.user_id)
-      return taggedParts.length ? this._sendTaggedReply(taggedParts) : this._sendReply(finalReply.content)
+      return taggedParts.length ? this._sendTaggedReply(taggedParts, replyQuote) : this._sendReply(finalReply.content, replyQuote)
     }
     log.error(`全部失败`)
     return this.reply("请求失败", true)
