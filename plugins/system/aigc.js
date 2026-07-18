@@ -488,7 +488,7 @@ export class AigcFallback extends plugin {
         return false
       }
       log.error(`${label}异常: ${err.message}`)
-      await this.reply("我有些累了，请让我休息一会儿", true)
+      if (!isAmbient) await this.reply("我有些累了，请让我休息一会儿", true)
     } finally {
       if (activeRequests.get(this.e.user_id)?.controller === controller) {
         activeRequests.delete(this.e.user_id)
@@ -695,7 +695,7 @@ export class AigcFallback extends plugin {
     const stateful = isAmbient ? false : (cfg.aigc?.gemini?.stateful ?? true)
     const ambientModel = (isAmbient && cfg.aigc?.ambient?.model) || undefined
     const replyQuote = !isAmbient // 插话不引用，at 对话引用
-    const rawHistory = await con().getMessages(this.e.self_id, this.e.user_id)
+    const rawHistory = isAmbient ? [] : await con().getMessages(this.e.self_id, this.e.user_id)
     const baseMessages = rawHistory.filter(m => m.role !== "system")
     const systemMsg = { role: "system", content: systemPrompt }
 
@@ -916,6 +916,7 @@ export class AigcFallback extends plugin {
       return taggedParts.length ? this._sendTaggedReply(taggedParts, replyQuote) : this._sendReply(finalReply.content, replyQuote)
     }
     log.error(`全部失败`)
+    if (isAmbient) return false
     return this.reply("请求失败", true)
   }
 }
