@@ -555,11 +555,12 @@ export class AigcFallback extends plugin {
 
       const card = e.sender?.card || e.sender?.nickname || ""
       const role = { owner: "群主", admin: "群管理员", member: "群成员" }[e.member?.role] || e.member?.role || "群成员"
+      const masterLabel = e.isMaster ? ", bot owner (master)" : ""
 
       const lines = []
       lines.push(`群信息: ${e.group_name || "Unknown"}(ID: ${e.group_id})`)
       lines.push(`你的群信息: ${botName}(QQ: ${e.self_id}${botRole ? `, ${botRole}` : ""})`)
-      lines.push(`用户群信息: ${card}(QQ: ${e.user_id}, ${role})`)
+      lines.push(`用户群信息: ${card}(QQ: ${e.user_id}, ${role}${masterLabel})`)
 
       const histCount = cfg.aigc?.group_history_count ?? 30
       if (histCount > 0) {
@@ -571,7 +572,31 @@ export class AigcFallback extends plugin {
     }
 
     const name = e.sender?.nickname || "Unknown"
-    return `<chat_context>\n用户信息: ${name}(QQ: ${e.user_id})\n</chat_context>`
+    const masterLabel = e.isMaster ? ", bot owner (master)" : ""
+    return `<chat_context>\n用户信息: ${name}(QQ: ${e.user_id}${masterLabel})\n</chat_context>`
+  }
+
+  /** 格式化群聊历史消息时间 */
+  _formatHistoryTime(timestamp) {
+    if (!timestamp) return ""
+    const now = new Date()
+    const msgTime = new Date(timestamp * 1000)
+    const pad = n => String(n).padStart(2, "0")
+
+    const today = dateStr(now)
+    const msgDate = dateStr(msgTime)
+
+    if (msgDate === today) {
+      return `${pad(msgTime.getHours())}:${pad(msgTime.getMinutes())}`
+    }
+
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    if (msgDate === dateStr(yesterday)) {
+      return `昨天${pad(msgTime.getHours())}:${pad(msgTime.getMinutes())}`
+    }
+
+    return "一天前"
   }
 
   /** 获取群聊最近 N 条消息 */
@@ -592,11 +617,16 @@ export class AigcFallback extends plugin {
         const name = sender.card || sender.nickname || "Unknown"
         const qq = sender.user_id || "?"
         const role = { owner: "群主", admin: "群管理员" }[sender.role] || ""
+        const isMaster = cfg.master[e.self_id]?.includes(String(qq))
+        const masterLabel = isMaster ? ", bot owner (master)" : ""
 
         const text = this._extractMsgText(msg)
         if (!text) continue
 
-        lines.push(`[${name}](QQ: ${qq}${role ? `, ${role}` : ""}): ${text}`)
+        const timeStr = this._formatHistoryTime(msg.time)
+        const timePart = timeStr ? `[${timeStr}] ` : ""
+
+        lines.push(`${timePart}[${name}](QQ: ${qq}${role ? `, ${role}` : ""}${masterLabel}): ${text}`)
       }
 
       return lines.length ? lines.join("\n") : null

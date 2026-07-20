@@ -19,6 +19,6 @@ timeout: 120000
 mihomo:
   enable: false # 是否启用代理订阅为维护
   sub_url: "" # 代理订阅链接
-  exclude_regex: "中国大陆" #节点过滤
+  exclude_regex: "中国大陆|香港|台湾" #节点过滤
   config_path: "/etc/mihomo/config.yaml" # 代理订阅配置文件路径
   service_name: "mihomo" # 自启动systemctl中的对应名称用于重启
