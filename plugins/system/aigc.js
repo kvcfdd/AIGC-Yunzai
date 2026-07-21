@@ -187,6 +187,9 @@ export class AigcFallback extends plugin {
         { reg: /^#结束对话$/i, fnc: "clearConv" },
         { reg: /^#结束全部对话$/i, fnc: "clearAllConv", permission: "master" },
         { reg: /^#总结记忆$/i, fnc: "manualMemory", permission: "master" },
+        { reg: /^#我的记忆$/i, fnc: "myMemory" },
+        { reg: /^#清除记忆$/i, fnc: "clearMemory" },
+        { reg: /^#清除全部记忆$/i, fnc: "clearAllMemory", permission: "master" },
         { reg: /^(.+)$/, fnc: "aigcChat", log: false },
       ],
     })
@@ -304,6 +307,13 @@ export class AigcFallback extends plugin {
 
   // 对话清除
   async clearConv() {
+    // 终止该用户进行中的请求
+    const req = activeRequests.get(this.e.user_id)
+    if (req) {
+      req.controller.abort()
+      log.info(`用户 ${this.e.user_id} 结束对话，已中止进行中的请求`)
+    }
+
     const msgs = await con().getMessages(this.e.self_id, this.e.user_id)
     if (!msgs.length) return this.reply("暂无对话记录", true)
 
@@ -314,9 +324,35 @@ export class AigcFallback extends plugin {
 
   async clearAllConv() {
     if (!this.e.isMaster) return false
+
+    // 终止所有进行中的请求
+    for (const [user_id, req] of activeRequests) {
+      req.controller.abort()
+      log.info(`管理员清除全部对话，已中止用户 ${user_id} 进行中的请求`)
+    }
+
     await con().clearAll()
     log.info("管理员清除了全部用户的对话记录")
     return this.reply("已清除全部用户的对话记录", true)
+  }
+
+  /** 清除当前用户的记忆 */
+  async clearMemory() {
+    const entries = await con().getMemoryEntries(this.e.self_id, this.e.user_id)
+    if (!entries?.length) return this.reply("暂无记忆记录", true)
+
+    await con().clearMemory(this.e.self_id, this.e.user_id)
+    log.info(`用户 ${this.e.user_id} 清除了记忆`)
+    return this.reply(`已清除 ${entries.length} 条记忆`, true)
+  }
+
+  /** 清除全部用户的记忆 */
+  async clearAllMemory() {
+    if (!this.e.isMaster) return false
+
+    await con().clearAllMemories()
+    log.info("管理员清除了全部用户的记忆")
+    return this.reply("已清除全部用户的记忆", true)
   }
 
   /** 手动触发昨天的记忆总结，便于测试或补漏 */
@@ -335,6 +371,22 @@ export class AigcFallback extends plugin {
       return this.reply("记忆总结完成", true)
     }
     return this.reply(`总结失败: ${result.reason}`, true)
+  }
+
+  /** 以合并转发形式查看缓存的记忆 */
+  async myMemory() {
+    const entries = await con().getMemoryEntries(this.e.self_id, this.e.user_id)
+    if (!entries?.length) return this.reply("暂无记忆记录", true)
+
+    const WEEKDAY = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+    const nodes = entries.map(e => {
+      const [y, m, d] = e.date.split("-").map(Number)
+      const w = WEEKDAY[new Date(y, m - 1, d).getDay()]
+      return { type: "text", data: { text: `${e.date} ${w}\n${e.summary}` } }
+    })
+
+    const fwd = await common.makeForwardMsg(this.e, nodes, "📋 我的记忆")
+    return this.reply(fwd)
   }
 
   // AIGC 对话主流程
