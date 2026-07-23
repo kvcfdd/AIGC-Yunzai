@@ -163,7 +163,10 @@ export class maintTask extends plugin {
       config["proxy-groups"].forEach(g => {
         if (g.proxies) g.proxies = g.proxies.filter(name => !regex.test(name))
       })
-    config.mode = "global"
+    config.mode = "rule"
+    config.rules = [
+      "MATCH,♻️自动选择"
+    ]
     try {
       await fs.writeFile(mihomo.config_path, YAML.stringify(config))
     } catch (err) {
