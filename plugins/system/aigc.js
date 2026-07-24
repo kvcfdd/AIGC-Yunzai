@@ -463,14 +463,24 @@ export class AigcFallback extends plugin {
         if (!whitelist.some(g => String(g) === gid)) return false
       }
 
-      if (!this.e.atBot) {
+      const gid = String(this.e.group_id)
+
+      if (this.e.atBot) {
+        for (const [, req] of activeRequests) {
+          if (req.isAmbient && req.group_id === gid) {
+            req.controller.abort()
+            log.info(`群 ${gid} 用户 ${this.e.user_id} @触发，已中止群内水群请求`)
+            break
+          }
+        }
+        await redis.set(`aigc:ambient:at_block:${gid}`, "1", { EX: 300 })
+      } else {
         const ambient = cfg.aigc?.ambient
         if (!ambient?.enable) return false
 
-        // 该用户已有进行中的请求 → 不触发插话，避免打断正常对话
-        if (activeRequests.has(this.e.user_id)) return false
+        // @对话后的 5 分钟冷却, 避免群内左脚踩右脚
+        if (await redis.get(`aigc:ambient:at_block:${gid}`)) return false
 
-        const gid = String(this.e.group_id)
         const cooldownKey = `${AMBIENT_KEY_PREFIX}:${gid}`
         const existing = await redis.get(cooldownKey)
         if (existing) {
@@ -489,12 +499,17 @@ export class AigcFallback extends plugin {
       }
     }
 
-    const userMsg = this._getUserMsg()
-    if (!userMsg) return false
+    let userMsg
+    if (isAmbient) {
+      userMsg = "[水群系统触发]"
+    } else {
+      userMsg = this._getUserMsg()
+      if (!userMsg) return false
 
-    // 前缀过滤（如 "[自动回复]"）
-    const prefixFilter = cfg.aigc?.prefix_filter
-    if (prefixFilter?.length && prefixFilter.some(p => userMsg.startsWith(p))) return false
+      // 前缀过滤（如 "[自动回复]"）
+      const prefixFilter = cfg.aigc?.prefix_filter
+      if (prefixFilter?.length && prefixFilter.some(p => userMsg.startsWith(p))) return false
+    }
 
     // 请求合并：上一轮未完成时取消旧请求，合并消息/图片/视频后重发
     let finalMsg = userMsg
@@ -516,7 +531,7 @@ export class AigcFallback extends plugin {
       }
     }
     const controller = new AbortController()
-    activeRequests.set(this.e.user_id, { controller, isAmbient, pendingMsg: finalMsg, pendingImg: finalImg, pendingVideo: finalVideo })
+    activeRequests.set(this.e.user_id, { controller, isAmbient, pendingMsg: finalMsg, pendingImg: finalImg, pendingVideo: finalVideo, group_id: this.e.isGroup ? String(this.e.group_id) : null })
 
     const key = con().sessionKey(this.e.self_id, this.e.user_id)
     // 主动插话不落盘，不计入当日活跃用户
@@ -529,7 +544,7 @@ export class AigcFallback extends plugin {
     const effectiveModel = isAmbient && cfg.aigc?.ambient?.model ? cfg.aigc.ambient.model : cfg.aigc?.gemini?.model || ""
 
     try {
-      const systemPrompt = await this._buildSystem(finalMsg, effectiveModel)
+      const systemPrompt = await this._buildSystem(finalMsg, effectiveModel, isAmbient)
       const images = await Bot.aigc.provider.resolveImages(finalImg)
       const removeAudio = /^gemma/i.test(effectiveModel)
       const videos = await Bot.aigc.provider.resolveVideo(finalVideo, removeAudio, controller.signal)
@@ -549,8 +564,9 @@ export class AigcFallback extends plugin {
   }
 
   /** 构建 system prompt：提示词 + 记忆 + 环境
-   *  @param effectiveModel 实际生效模型，用于模型族条件判断 */
-  async _buildSystem(userMsg, effectiveModel = "") {
+   *  @param effectiveModel 实际生效模型，用于模型族条件判断
+   *  @param isAmbient 是否水群模式 */
+  async _buildSystem(userMsg, effectiveModel = "", isAmbient = false) {
     const parts = []
 
     // Gemma 4 系列：在 System Prompt 最前面自动注入 <|think|> token 以激活深度思考模式
@@ -566,11 +582,13 @@ export class AigcFallback extends plugin {
     if (supplement) parts.push(supplement)
 
     // 长期记忆
-    const memories = await con().getMemories(this.e.self_id, this.e.user_id)
-    if (memories) parts.push(`<user_memories>\n${memories}\n</user_memories>`)
+    if (!isAmbient) {
+      const memories = await con().getMemories(this.e.self_id, this.e.user_id)
+      if (memories) parts.push(`<user_memories>\n${memories}\n</user_memories>`)
+    }
 
     // 对话环境
-    const envCtx = await this._buildEnvContext()
+    const envCtx = await this._buildEnvContext(isAmbient)
     if (envCtx) parts.push(envCtx)
 
     return parts.join("\n")
@@ -586,8 +604,9 @@ export class AigcFallback extends plugin {
     return lines.join("\n")
   }
 
-  /** 群聊/私聊环境信息 */
-  async _buildEnvContext() {
+  /** 群聊/私聊环境信息
+   *  @param isAmbient 是否水群模式 */
+  async _buildEnvContext(isAmbient = false) {
     const e = this.e
 
     if (e.isGroup) {
@@ -605,14 +624,18 @@ export class AigcFallback extends plugin {
         }
       })()
 
-      const card = e.sender?.card || e.sender?.nickname || ""
-      const role = { owner: "群主", admin: "群管理员", member: "群成员" }[e.member?.role] || e.member?.role || "群成员"
-      const masterLabel = e.isMaster ? ", bot owner (master)" : ""
-
       const lines = []
       lines.push(`群信息: ${e.group_name || "Unknown"}(ID: ${e.group_id})`)
       lines.push(`你的群信息: ${botName}(QQ: ${e.self_id}${botRole ? `, ${botRole}` : ""})`)
-      lines.push(`用户群信息: ${card}(QQ: ${e.user_id}, ${role}${masterLabel})`)
+
+      if (isAmbient) {
+        lines.push("[系统提示] 本次为水群系统触发，请根据群聊中群友们最近的聊天内容自行判断是否参与水群。如果决定参与，请确保回复自然融入；如果决定不参与，输出 no_reply 即可。")
+      } else {
+        const card = e.sender?.card || e.sender?.nickname || ""
+        const role = { owner: "群主", admin: "群管理员", member: "群成员" }[e.member?.role] || e.member?.role || "群成员"
+        const masterLabel = e.isMaster ? ", bot owner (master)" : ""
+        lines.push(`用户群信息: ${card}(QQ: ${e.user_id}, ${role}${masterLabel})`)
+      }
 
       const histCount = cfg.aigc?.group_history_count ?? 30
       if (histCount > 0) {
