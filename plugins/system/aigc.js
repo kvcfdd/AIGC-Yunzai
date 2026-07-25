@@ -629,7 +629,7 @@ export class AigcFallback extends plugin {
       lines.push(`你的群信息: ${botName}(QQ: ${e.self_id}${botRole ? `, ${botRole}` : ""})`)
 
       if (isAmbient) {
-        lines.push("[系统提示] 本次为水群系统触发，请根据群聊中群友们最近的聊天内容自行判断是否参与水群。如果决定参与，请确保回复自然融入；如果决定不参与，输出 no_reply 即可。")
+        lines.push("[系统提示] 本次为水群系统触发，请根据群聊中群友们最近的聊天内容自行判断是否参与水群。如果决定参与，请确保回复自然融入；如不想参与，输出 no_reply 即可；如果想参与但不知道说啥可以发个表情包后再输出 no_reply")
       } else {
         const card = e.sender?.card || e.sender?.nickname || ""
         const role = { owner: "群主", admin: "群管理员", member: "群成员" }[e.member?.role] || e.member?.role || "群成员"
@@ -749,6 +749,8 @@ export class AigcFallback extends plugin {
         parts.push(title ? `[小程序: ${title}](${url})` : url ? `[分享](${url})` : "[分享]")
       } else if (seg.type === "markdown") {
         parts.push("[Markdown]")
+      } else if (seg.type === "forward") {
+        parts.push("[合并转发]")
       }
     }
     return parts.join("").trim()
