@@ -47,7 +47,7 @@ mcp:
 # 本地代理
 proxy:
   address: "" # 代理地址，如 http://127.0.0.1:7890，为空则不启用
-  enable: true # LLM 请求是否走代理
+  enable: false # LLM 请求是否走代理
 
 # 私聊开关
 private_enable: true
