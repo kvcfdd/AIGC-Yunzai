@@ -587,8 +587,22 @@ export class AigcFallback extends plugin {
       if (memories) parts.push(`<user_memories>\n${memories}\n</user_memories>`)
     }
 
+    // 从群聊记录提取涉及用户 → 查缓存 → 注入提示词
+    // 与 _buildEnvContext 共享一次群聊历史拉取，避免重复请求
+    let rawHistory = null
+    if (!isAmbient && this.e.isGroup) {
+      const histCount = cfg.aigc?.group_history_count ?? 30
+      if (histCount > 0) {
+        rawHistory = await this._getGroupHistoryRaw(histCount)
+      }
+    }
+    if (rawHistory) {
+      const groupUsersCtx = await this._buildGroupUsersContext(rawHistory)
+      if (groupUsersCtx) parts.push(groupUsersCtx)
+    }
+
     // 对话环境
-    const envCtx = await this._buildEnvContext(isAmbient)
+    const envCtx = await this._buildEnvContext(isAmbient, rawHistory)
     if (envCtx) parts.push(envCtx)
 
     return parts.join("\n")
@@ -605,8 +619,9 @@ export class AigcFallback extends plugin {
   }
 
   /** 群聊/私聊环境信息
-   *  @param isAmbient 是否水群模式 */
-  async _buildEnvContext(isAmbient = false) {
+   *  @param isAmbient 是否水群模式
+   *  @param rawHistory 预取的群聊原始消息，避免重复拉取 */
+  async _buildEnvContext(isAmbient = false, rawHistory = null) {
     const e = this.e
 
     if (e.isGroup) {
@@ -639,8 +654,11 @@ export class AigcFallback extends plugin {
 
       const histCount = cfg.aigc?.group_history_count ?? 30
       if (histCount > 0) {
-        const history = await this._getGroupHistory(histCount)
-        if (history) lines.push(`<group_history>\n${history}\n</group_history>`)
+        const msgs = rawHistory ?? (await this._getGroupHistoryRaw(histCount))
+        if (msgs) {
+          const history = this._formatGroupHistory(msgs)
+          if (history) lines.push(`<group_history>\n${history}\n</group_history>`)
+        }
       }
 
       return `<chat_context>\n${lines.join("\n")}\n</chat_context>`
@@ -674,8 +692,8 @@ export class AigcFallback extends plugin {
     return "一天前"
   }
 
-  /** 获取群聊最近 N 条消息 */
-  async _getGroupHistory(count) {
+  /** 获取群聊最近 N 条原始消息 */
+  async _getGroupHistoryRaw(count) {
     try {
       const e = this.e
       if (!e.group?.getChatHistory) return null
@@ -684,31 +702,112 @@ export class AigcFallback extends plugin {
       if (!msgSeq) return null
 
       const msgs = await e.group.getChatHistory(msgSeq, count, true)
-      if (!msgs?.length) return null
-
-      const lines = []
-      for (const msg of msgs) {
-        const sender = msg.sender || {}
-        const name = sender.card || sender.nickname || "Unknown"
-        const qq = sender.user_id || "?"
-        const role = { owner: "群主", admin: "群管理员" }[sender.role] || ""
-        const isMaster = cfg.master[e.self_id]?.includes(String(qq))
-        const masterLabel = isMaster ? ", bot owner (master)" : ""
-
-        const text = this._extractMsgText(msg)
-        if (!text) continue
-
-        const timeStr = this._formatHistoryTime(msg.time)
-        const timePart = timeStr ? `[${timeStr}] ` : ""
-
-        lines.push(`${timePart}[${name}](QQ: ${qq}${role ? `, ${role}` : ""}${masterLabel}): ${text}`)
-      }
-
-      return lines.length ? lines.join("\n") : null
+      return msgs?.length ? msgs : null
     } catch (err) {
       log.warn(`群聊记录获取失败: ${err.message}`)
       return null
     }
+  }
+
+  /** 将原始群聊消息格式化为文本行 */
+  _formatGroupHistory(msgs) {
+    const lines = []
+    for (const msg of msgs) {
+      const sender = msg.sender || {}
+      const name = sender.card || sender.nickname || "Unknown"
+      const qq = sender.user_id || "?"
+      const role = { owner: "群主", admin: "群管理员" }[sender.role] || ""
+      const isMaster = cfg.master[this.e.self_id]?.includes(String(qq))
+      const masterLabel = isMaster ? ", bot owner (master)" : ""
+
+      const text = this._extractMsgText(msg)
+      if (!text) continue
+
+      const timeStr = this._formatHistoryTime(msg.time)
+      const timePart = timeStr ? `[${timeStr}] ` : ""
+
+      lines.push(`${timePart}[${name}](QQ: ${qq}${role ? `, ${role}` : ""}${masterLabel}): ${text}`)
+    }
+
+    return lines.length ? lines.join("\n") : null
+  }
+
+  /** 获取群聊最近 N 条消息 */
+  async _getGroupHistory(count) {
+    const msgs = await this._getGroupHistoryRaw(count)
+    if (!msgs) return null
+    return this._formatGroupHistory(msgs)
+  }
+
+  /** 从群聊原始消息中提取所有发送者 ID */
+  _extractUsersFromHistory(rawMsgs) {
+    const userIds = new Set()
+    for (const msg of rawMsgs) {
+      const senderId = msg.sender?.user_id
+      if (senderId && String(senderId) !== String(this.e.self_id)) {
+        userIds.add(String(senderId))
+      }
+    }
+    return userIds
+  }
+
+  /** 获取当前触发消息中 @ 的其他用户 */
+  _getCurrentAtTargets() {
+    const targets = new Set()
+    const segs = this.e.message
+    if (Array.isArray(segs)) {
+      for (const seg of segs) {
+        if (seg.type === "at" && seg.qq !== "all" && String(seg.qq) !== String(this.e.self_id)) {
+          targets.add(String(seg.qq))
+        }
+      }
+    }
+    return targets
+  }
+
+  /** 格式化单个用户的对话记录 */
+  _formatUserConversation(userId, msgs) {
+    const name = this._resolveAtName(userId)
+    const lines = []
+    for (const msg of msgs) {
+      if (msg.role === "user") {
+        lines.push(`${name}: ${msg.content || ""}`)
+      } else if (msg.role === "assistant" && msg.content) {
+        lines.push(`我: ${msg.content}`)
+      }
+    }
+    return lines.length ? `  <user qq="${userId}" name="${name}">\n    ${lines.join("\n    ")}\n  </user>` : ""
+  }
+
+  /** 构建群聊关联用户对话上下文：从群聊记录提取涉及用户 → 查缓存 → XML 包裹
+   *  @param {Array} rawHistory - 群聊原始消息数组 */
+  async _buildGroupUsersContext(rawHistory) {
+    if (!rawHistory?.length) return ""
+
+    // 提取群聊记录中涉及的所有用户
+    const userIds = this._extractUsersFromHistory(rawHistory)
+
+    // 追加当前消息中 @ 的用户
+    const atTargets = this._getCurrentAtTargets()
+    for (const qq of atTargets) userIds.add(qq)
+
+    // 去掉触发对话的用户自身
+    if (this.e.user_id) userIds.delete(String(this.e.user_id))
+
+    if (!userIds.size) return ""
+
+    // 逐个用户查缓存、格式化
+    const userParts = []
+    for (const userId of userIds) {
+      const msgs = await con().getMessages(this.e.self_id, userId, 3)
+      if (!msgs?.length) continue
+
+      const formatted = this._formatUserConversation(userId, msgs)
+      if (formatted) userParts.push(formatted)
+    }
+
+    if (!userParts.length) return ""
+    return `<group_users_context>\n${userParts.join("\n")}\n</group_users_context>`
   }
 
   /** 从群聊历史消息段重建完整文本，保留 @/表情/图片/文件 */
