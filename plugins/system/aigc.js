@@ -936,8 +936,7 @@ export class AigcFallback extends plugin {
 
     for (let round = 0; round < maxRounds; round++) {
       // 构建本轮 API 请求的消息
-      let apiMessages,
-        unsentToolNames = ""
+      let apiMessages
       if (round === 0) {
         // 有状态+已有上下文 → 仅发增量；否则带历史
         apiMessages = stateful && prevIactId ? [systemMsg, firstUserMsg] : [systemMsg, ...baseMessages, firstUserMsg]
@@ -945,10 +944,6 @@ export class AigcFallback extends plugin {
         // 后续工具轮：有状态 → 仅发送未发送过的 tool 结果
         //            无状态 → 发送完整历史 + 本轮累积
         const unsentTools = localPending.filter(m => m.role === "tool" && !m._sent)
-        unsentToolNames = unsentTools
-          .map(m => m.name)
-          .filter(Boolean)
-          .join(",")
         apiMessages = stateful && prevIactId ? [systemMsg, ...unsentTools] : [systemMsg, ...baseMessages, ...localPending]
         // 标记这些 tool 消息为已发送，下轮不再重复
         for (const m of unsentTools) m._sent = true

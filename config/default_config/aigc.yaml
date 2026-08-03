@@ -12,6 +12,8 @@ gemini:
 
 # 输出最大长度
 max_tokens: 4096
+# 代码生成输出最大长度 (run_script spec 模式子模型专用)，默认 65536
+# code_gen_max_tokens: 65536
 # 输出随机程度 (0-2，值越大输出越随机)
 temperature: 1
 # 工具调用轮次上限 (2-10)
