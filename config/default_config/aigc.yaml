@@ -6,6 +6,7 @@ gemini:
   endpoint: https://generativelanguage.googleapis.com # 可替换为兼容 Google Gemini API 的反代地址
   api_key: "" # 多 Key 用英文逗号分隔，如 "xxx,yyy"
   model: gemini-3.6-flash # 模型
+  secondary_model: "gemini-3-flash-preview" # 副模型：定时任务/后台任务/注入消息使用的模型，留空走主模型
   stateful: false # 有状态模式：服务端管理上下文
   thinking_level: medium # 思考等级 minimal, low, medium, high
 

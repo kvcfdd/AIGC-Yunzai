@@ -442,7 +442,7 @@ export class AigcFallback extends plugin {
 
   async aigcChat() {
     if (cfg.aigc?.enable === false) return false
-    if (this.e._synthetic) return false
+    if (this.e._synthetic && !this.e._injected) return false
     if (this.e.isPrivate && cfg.aigc?.private_enable === false && !this.e.isMaster) return false
 
     // 黑名单检查
@@ -506,9 +506,9 @@ export class AigcFallback extends plugin {
       userMsg = this._getUserMsg()
       if (!userMsg) return false
 
-      // 前缀过滤（如 "[自动回复]"）
+      // 前缀过滤（如 "[自动回复]"）。注入消息是系统触发，绕过此检查
       const prefixFilter = cfg.aigc?.prefix_filter
-      if (prefixFilter?.length && prefixFilter.some(p => userMsg.startsWith(p))) return false
+      if (!this.e._injected && prefixFilter?.length && prefixFilter.some(p => userMsg.startsWith(p))) return false
     }
 
     // 请求合并：上一轮未完成时取消旧请求，合并消息/图片/视频后重发
@@ -541,14 +541,16 @@ export class AigcFallback extends plugin {
     log.info(`用户 ${this.e.user_id} 发起${label}`)
 
     // 分流模型，影响模型族条件行为
-    const effectiveModel = isAmbient && cfg.aigc?.ambient?.model ? cfg.aigc.ambient.model : cfg.aigc?.gemini?.model || ""
+    const mainModel = cfg.aigc?.gemini?.model || ""
+    const effectiveModel = isAmbient && cfg.aigc?.ambient?.model ? cfg.aigc.ambient.model : mainModel
+    const injectedModel = this.e._injected ? cfg.aigc?.gemini?.secondary_model || mainModel || undefined : undefined
 
     try {
       const systemPrompt = await this._buildSystem(finalMsg, effectiveModel, isAmbient)
       const images = await Bot.aigc.provider.resolveImages(finalImg)
       const removeAudio = /^gemma/i.test(effectiveModel)
       const videos = await Bot.aigc.provider.resolveVideo(finalVideo, removeAudio, controller.signal)
-      await this._replyLoop(key, finalMsg, images, videos, systemPrompt, controller.signal, isAmbient)
+      await this._replyLoop(key, finalMsg, images, videos, systemPrompt, controller.signal, isAmbient, injectedModel)
     } catch (err) {
       if (err?.name === "AbortError") {
         log.info(`用户 ${this.e.user_id} 打断`)
@@ -650,6 +652,10 @@ export class AigcFallback extends plugin {
         const role = { owner: "群主", admin: "群管理员", member: "群成员" }[e.member?.role] || e.member?.role || "群成员"
         const masterLabel = e.isMaster ? ", bot owner (master)" : ""
         lines.push(`用户群信息: ${card}(QQ: ${e.user_id}, ${role}${masterLabel})`)
+        // 定时任务/后台任务触发的群聊消息 → 提醒 LLM @目标用户
+        if (e._injected) {
+          lines.push(`[系统提示] 这轮对话由定时任务/后台任务自动触发(非用户主动发消息)。你需要主动 @${e.user_id} 来提醒该用户查看你的回复。`)
+        }
       }
 
       const histCount = cfg.aigc?.group_history_count ?? 30
@@ -897,9 +903,9 @@ export class AigcFallback extends plugin {
    *  - apiMessages[]   每轮实际发送给 API 的消息
    *  有状态模式：通过 previous_interaction_id 让服务端管理上下文。
    *  主动插话：固定无状态 + ambient.model 分流，可用工具/记忆/上下文，但整轮不落盘。 */
-  async _replyLoop(sessionKey, userMsg, images, videos, systemPrompt, signal, isAmbient = false) {
+  async _replyLoop(sessionKey, userMsg, images, videos, systemPrompt, signal, isAmbient = false, injectedModel) {
     const stateful = isAmbient ? false : (cfg.aigc?.gemini?.stateful ?? true)
-    const ambientModel = (isAmbient && cfg.aigc?.ambient?.model) || undefined
+    const ambientModel = injectedModel || (isAmbient && cfg.aigc?.ambient?.model) || undefined
     const replyQuote = !isAmbient // 插话不引用，at 对话引用
     const rawHistory = isAmbient ? [] : await con().getMessages(this.e.self_id, this.e.user_id)
     const baseMessages = rawHistory.filter(m => m.role !== "system")
@@ -930,7 +936,8 @@ export class AigcFallback extends plugin {
 
     for (let round = 0; round < maxRounds; round++) {
       // 构建本轮 API 请求的消息
-      let apiMessages
+      let apiMessages,
+        unsentToolNames = ""
       if (round === 0) {
         // 有状态+已有上下文 → 仅发增量；否则带历史
         apiMessages = stateful && prevIactId ? [systemMsg, firstUserMsg] : [systemMsg, ...baseMessages, firstUserMsg]
@@ -938,6 +945,10 @@ export class AigcFallback extends plugin {
         // 后续工具轮：有状态 → 仅发送未发送过的 tool 结果
         //            无状态 → 发送完整历史 + 本轮累积
         const unsentTools = localPending.filter(m => m.role === "tool" && !m._sent)
+        unsentToolNames = unsentTools
+          .map(m => m.name)
+          .filter(Boolean)
+          .join(",")
         apiMessages = stateful && prevIactId ? [systemMsg, ...unsentTools] : [systemMsg, ...baseMessages, ...localPending]
         // 标记这些 tool 消息为已发送，下轮不再重复
         for (const m of unsentTools) m._sent = true
@@ -1016,14 +1027,29 @@ export class AigcFallback extends plugin {
           }),
         )
 
+        // 工具执行结果摘要日志
+        for (const r of results) {
+          const ok = !("error" in r)
+          const resultStr = ok ? (typeof r.result === "string" ? r.result : JSON.stringify(r.result ?? "")) : r.error
+          const preview = resultStr.length > 120 ? resultStr.slice(0, 120) + "..." : resultStr
+          log.info(`工具 ${r.name}: ${ok ? "✅" : "❌"} ${preview}`)
+        }
+
         const lastRound = round === maxRounds - 1
         for (let i = 0; i < results.length; i++) {
           const r = results[i]
           const callId = res.tool_calls[i]?.id || `call_${i}`
           const callSig = res.tool_calls[i]?.signature || null
           const payload = "error" in r ? r.error : r.result
+
+          // 延迟任务协议: 工具返回 { deferred: true, message: "..." }
+          // → 把 message 当 tool result 传给 LLM，后台任务完成后走 injectMessage
+          const isDeferred = payload && typeof payload === "object" && payload.deferred && payload.message
           let tContent, tImages, tVideos
-          if (payload && typeof payload === "object") {
+          if (isDeferred) {
+            tContent = payload.message
+            log.info(`工具 ${r.name} 返回 deferred，任务将在后台执行`)
+          } else if (payload && typeof payload === "object") {
             if (Array.isArray(payload.images)) {
               tImages = payload.images
               tContent = payload.text || "图片获取成功"
@@ -1125,4 +1151,88 @@ export class AigcFallback extends plugin {
     if (isAmbient) return false
     return this.reply("请求失败", true)
   }
+}
+
+// injectMessage 实现 — 注册到 Bot.aigc.injectMessage._impl
+// 让后台任务/定时器能通过合成消息唤醒 LLM
+Bot.aigc.injectMessage._impl = async function (params) {
+  const { self_id, user_id, group_id, text } = params
+
+  if (!self_id || !user_id || !text) {
+    log.error("injectMessage 参数缺失", params)
+    return
+  }
+
+  if (!Bot.bots[self_id]) {
+    log.error(`injectMessage: Bot ${self_id} 不在线`)
+    return
+  }
+
+  // 构造最小化合成事件，模仿真实消息事件的结构
+  const e = {
+    self_id,
+    user_id,
+    message: [{ type: "text", text }],
+    msg: text,
+    img: [],
+    video: [],
+    atBot: true,
+    _injected: true,
+    ...(group_id ? { group_id, message_type: "group", isGroup: true } : { message_type: "private", isPrivate: true }),
+  }
+
+  // 复用 Bot.prepareEvent 填充 bot/friend/group/member/sender/reply
+  Bot.prepareEvent(e)
+
+  // prepareEvent 可能拿不到昵称/群名，多重回退补齐
+  if (!e.sender) e.sender = { user_id }
+
+  // 回退拿用户昵称: friend → group member → 全局好友列表 → QQ号
+  if (!e.sender.nickname || e.sender.nickname === String(user_id)) {
+    // 尝试好友列表
+    try {
+      const friend = Bot.fl?.get(Number(user_id)) || Bot.fl?.get(String(user_id))
+      if (friend?.nickname) e.sender.nickname = friend.nickname
+    } catch {}
+    // 群内尝试取群名片
+    if (e.isGroup) {
+      try {
+        const member = e.group?.pickMember?.(user_id)
+        if (member) {
+          e.sender.nickname ||= member.nickname || member.name
+          e.sender.card = member.card || e.sender.card
+        }
+      } catch {}
+    }
+  }
+
+  // 回退拿群名
+  if (e.isGroup && !e.group_name) {
+    try {
+      e.group_name = e.group?.name || e.group?.group_name
+    } catch {}
+  }
+
+  // 补充 isMaster 标记
+  if (e.user_id && cfg.master[e.self_id]?.includes(String(e.user_id))) {
+    e.isMaster = true
+  }
+
+  // 补充 reply 回退
+  if (!e.reply) {
+    if (e.group?.sendMsg) e.reply = e.group.sendMsg.bind(e.group)
+    else if (e.friend?.sendMsg) e.reply = e.friend.sendMsg.bind(e.friend)
+  }
+
+  // 补充 logText
+  const senderName = e.sender?.nickname || e.sender?.card || String(user_id)
+  const groupLabel = e.isGroup ? `${e.group_name || group_id}, ` : ""
+  e.logText = `${logger.cyan(`[${groupLabel}${senderName}(${user_id})]`)}${logger.red(`[${(text || "").slice(0, 50)}]`)}`
+
+  log.info(`注入合成消息 → ${user_id}${group_id ? ` (群:${group_id})` : ""}: ${text.slice(0, 80)}`)
+
+  // 直接创建插件实例并执行对话流程
+  const instance = new AigcFallback()
+  instance.e = e
+  return instance.aigcChat()
 }
