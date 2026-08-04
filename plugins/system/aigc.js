@@ -4,6 +4,8 @@ import { formatDate } from "../../lib/aigc/helpers/time.js"
 import { faceName, faceId } from "../../lib/aigc/helpers/face.js"
 import log from "../../lib/aigc/helpers/log.js"
 import { yesterdayStr, dateStr } from "../../lib/aigc/conversation.js"
+import { summarizeOne, dailyMemoryJob } from "../../lib/aigc/helpers/memory.js"
+import { parseTaggedReply, extractUsersFromHistory, buildAssistantMsg, userMsgMeta, formatGroupHistory } from "../../lib/aigc/helpers/message.js"
 
 const con = () => Bot.aigc.conversation
 const tools = () => Bot.aigc.tools
@@ -14,163 +16,6 @@ const AMBIENT_KEY_PREFIX = "aigc:ambient:cooldown"
 // 请求合并: user_id → { controller, pendingMsg, pendingImg, pendingVideo }
 // 同一用户触发新对话时，取消上一轮未完成的请求，合并消息/图片/视频后重发
 const activeRequests = new Map()
-
-/** 总结单个用户指定日期的对话 → 记忆 → 裁剪 → 删更早键
- *  返回 { ok, reason? } */
-async function summarizeOne(self_id, user_id, date) {
-  if (await con().hasMemoryForDate(self_id, user_id, date)) {
-    return { ok: true, reason: "已存在记忆，跳过" }
-  }
-
-  const key = con().sessionKey(self_id, user_id, date)
-  const session = await con()._read(key)
-  if (!session?.messages?.length) return { ok: false, reason: "无对话记录" }
-
-  const qa = con().extractQA(session.messages)
-  if (!qa) return { ok: false, reason: "无可总结内容" }
-
-  try {
-    const ambient = cfg.aigc?.ambient || {}
-    const opts = { stateful: false, retry_count: 2 }
-    if (ambient.model) opts.model = ambient.model
-    const res = await Bot.aigc.provider.chat(
-      [
-        { role: "system", content: `你是一个对话总结助手。请以AI助手第一人称的视角将以下用户与AI助手的对话总结为一段摘要（不超过200字），即在200字范围内尽可能详细的说明聊了什么。请直接输出摘要文本，不要加任何前缀或解释。\n\n#对话内容：\n${qa}` },
-        { role: "user", content: "[记忆总结触发]" },
-      ],
-      opts,
-    )
-    const summary = (res.content || "").trim()
-    if (summary) {
-      await con().addMemory(self_id, user_id, date, summary)
-      log.debug(`记忆已保存: ${self_id}/${user_id}`)
-    }
-  } catch (err) {
-    log.warn(`记忆总结 LLM 调用失败 [${self_id}/${user_id}]: ${err.message}`)
-    return { ok: false, reason: `LLM 调用失败: ${err.message}` }
-  }
-
-  // 裁剪 + 删更早键
-  try {
-    const s = await con()._read(key)
-    if (s) {
-      con().trimTo(s, 5)
-      await con()._write(key, s)
-    }
-    await con().deleteOlderThan(self_id, user_id, date)
-  } catch (err) {
-    log.error(`裁剪失败 [${self_id}/${user_id}]: ${err.message}`)
-  }
-
-  return { ok: true }
-}
-
-/** 扫描今天之前所有未归档日期，按时序逐天总结 */
-async function dailyMemoryJob() {
-  const today = dateStr()
-
-  // 获取所有历史活跃日期，筛选出今天之前的
-  const allDates = await con().scanAllActiveDates()
-  const pastDates = allDates.filter(d => d < today)
-  if (!pastDates.length) {
-    log.info("每日记忆总结: 无历史未归档对话记录")
-    return
-  }
-
-  log.info(`每日记忆总结: 发现 ${pastDates.length} 个历史日期，按时序归档`)
-
-  const failed = []
-  const userLock = async (user_id, fn) => {
-    const lockKey = `aigc:lock:${user_id}`
-    if (await redis.get(lockKey)) return false
-    await redis.set(lockKey, "1", { EX: 300 })
-    try {
-      return await fn()
-    } finally {
-      await redis.del(lockKey)
-    }
-  }
-
-  // 按日期从旧到新，逐天逐人归档
-  for (const targetDate of pastDates.sort()) {
-    const users = await con().scanUsersForDate(targetDate)
-    if (!users.length) {
-      await con().clearActiveUsersForDate(targetDate)
-      continue
-    }
-
-    log.info(`每日记忆总结: 归档 [${targetDate}] ${users.length} 个用户`)
-
-    const succeeded = new Set()
-
-    // 第一轮
-    for (const user of users) {
-      const [self_id, user_id] = user.split(":")
-      const executed = await userLock(user_id, async () => {
-        const result = await summarizeOne(self_id, user_id, targetDate)
-        if (!result.ok) {
-          failed.push({ user, date: targetDate })
-          log.warn(`归档失败 [${user}] (${targetDate}): ${result.reason}`)
-        } else {
-          succeeded.add(user)
-        }
-        return true
-      })
-      if (executed === false) {
-        log.info(`每日记忆总结: 用户忙碌 [${user}] (${targetDate})，加入重试队列`)
-        failed.push({ user, date: targetDate })
-      }
-    }
-
-    // 当前日期全部成功 → 清除活跃记录；否则保留待下次 cron 补漏
-    if (succeeded.size === users.length) {
-      try {
-        await con().clearActiveUsersForDate(targetDate)
-      } catch (err) {
-        log.warn(`清理活跃记录失败 [${targetDate}]: ${err.message}`)
-      }
-    }
-  }
-
-  // 重试失败/忙碌的任务
-  if (failed.length) {
-    log.info(`每日记忆总结: 等待 5 秒后重试 ${failed.length} 个失败/忙碌记录`)
-    await Bot.sleep(5000)
-
-    for (const { user, date } of failed) {
-      const [self_id, user_id] = user.split(":")
-      const executed = await userLock(user_id, async () => {
-        const result = await summarizeOne(self_id, user_id, date)
-        if (result.ok) {
-          // 重试成功 → 检查该日期所有活跃用户是否都已生成记忆
-          const allUsers = await con().scanUsersForDate(date)
-          if (allUsers.length) {
-            let allDone = true
-            for (const u of allUsers) {
-              const [s, uid] = u.split(":")
-              if (!(await con().hasMemoryForDate(s, uid, date))) {
-                allDone = false
-                break
-              }
-            }
-            if (allDone) {
-              await con().clearActiveUsersForDate(date)
-              log.info(`日期 [${date}] 所有用户归档完成，活跃记录已清理`)
-            }
-          }
-        } else {
-          log.warn(`每日记忆总结: 重试仍失败 [${user}] (${date}): ${result.reason}，保留活跃记录待下次 cron 补漏`)
-        }
-        return true
-      })
-      if (executed === false) {
-        log.warn(`每日记忆总结: 重试时用户 [${user}] (${date}) 仍忙碌，保留活跃记录待下次 cron 补漏`)
-      }
-    }
-  }
-
-  log.info("每日记忆总结: 完成")
-}
 
 /** AIGC 入口：被 @ 且无命令匹配时触发，支持工具调用、长期记忆、知识库检索 */
 export class AigcFallback extends plugin {
@@ -241,18 +86,6 @@ export class AigcFallback extends plugin {
   /** 发送纯文本回复 */
   async _sendReply(text, quote = true) {
     return this.reply(text, quote)
-  }
-
-  /** 解析 XML 标签回复 → [{ type: "reply"|"voice", text }]，无标签返回 [] */
-  _parseTaggedReply(text) {
-    const parts = []
-    const re = /<(reply|voice)>(.*?)<\/\1>/gs
-    let m
-    while ((m = re.exec(text)) !== null) {
-      const content = m[2].trim()
-      if (content) parts.push({ type: m[1], text: content })
-    }
-    return parts
   }
 
   /** 处理带标签的回复：<reply> 发文本，<voice> 转语音，支持混排多条 */
@@ -543,14 +376,13 @@ export class AigcFallback extends plugin {
     // 分流模型，影响模型族条件行为
     const mainModel = cfg.aigc?.gemini?.model || ""
     const effectiveModel = isAmbient && cfg.aigc?.ambient?.model ? cfg.aigc.ambient.model : mainModel
-    const injectedModel = this.e._injected ? cfg.aigc?.gemini?.secondary_model || mainModel || undefined : undefined
 
     try {
       const systemPrompt = await this._buildSystem(finalMsg, effectiveModel, isAmbient)
       const images = await Bot.aigc.provider.resolveImages(finalImg)
       const removeAudio = /^gemma/i.test(effectiveModel)
       const videos = await Bot.aigc.provider.resolveVideo(finalVideo, removeAudio, controller.signal)
-      await this._replyLoop(key, finalMsg, images, videos, systemPrompt, controller.signal, isAmbient, injectedModel)
+      await this._replyLoop(key, finalMsg, images, videos, systemPrompt, controller.signal, isAmbient)
     } catch (err) {
       if (err?.name === "AbortError") {
         log.info(`用户 ${this.e.user_id} 打断`)
@@ -662,7 +494,7 @@ export class AigcFallback extends plugin {
       if (histCount > 0) {
         const msgs = rawHistory ?? (await this._getGroupHistoryRaw(histCount))
         if (msgs) {
-          const history = this._formatGroupHistory(msgs)
+          const history = formatGroupHistory(msgs, this._resolveAtName.bind(this), this.e.self_id, cfg.master)
           if (history) lines.push(`<group_history>\n${history}\n</group_history>`)
         }
       }
@@ -673,29 +505,6 @@ export class AigcFallback extends plugin {
     const name = e.sender?.nickname || "Unknown"
     const masterLabel = e.isMaster ? ", bot owner (master)" : ""
     return `<chat_context>\n用户信息: ${name}(QQ: ${e.user_id}${masterLabel})\n</chat_context>`
-  }
-
-  /** 格式化群聊历史消息时间 */
-  _formatHistoryTime(timestamp) {
-    if (!timestamp) return ""
-    const now = new Date()
-    const msgTime = new Date(timestamp * 1000)
-    const pad = n => String(n).padStart(2, "0")
-
-    const today = dateStr(now)
-    const msgDate = dateStr(msgTime)
-
-    if (msgDate === today) {
-      return `${pad(msgTime.getHours())}:${pad(msgTime.getMinutes())}`
-    }
-
-    const yesterday = new Date(now)
-    yesterday.setDate(yesterday.getDate() - 1)
-    if (msgDate === dateStr(yesterday)) {
-      return `昨天${pad(msgTime.getHours())}:${pad(msgTime.getMinutes())}`
-    }
-
-    return "一天前"
   }
 
   /** 获取群聊最近 N 条原始消息 */
@@ -715,46 +524,11 @@ export class AigcFallback extends plugin {
     }
   }
 
-  /** 将原始群聊消息格式化为文本行 */
-  _formatGroupHistory(msgs) {
-    const lines = []
-    for (const msg of msgs) {
-      const sender = msg.sender || {}
-      const name = sender.card || sender.nickname || "Unknown"
-      const qq = sender.user_id || "?"
-      const role = { owner: "群主", admin: "群管理员" }[sender.role] || ""
-      const isMaster = cfg.master[this.e.self_id]?.includes(String(qq))
-      const masterLabel = isMaster ? ", bot owner (master)" : ""
-
-      const text = this._extractMsgText(msg)
-      if (!text) continue
-
-      const timeStr = this._formatHistoryTime(msg.time)
-      const timePart = timeStr ? `[${timeStr}] ` : ""
-
-      lines.push(`${timePart}[${name}](QQ: ${qq}${role ? `, ${role}` : ""}${masterLabel}): ${text}`)
-    }
-
-    return lines.length ? lines.join("\n") : null
-  }
-
   /** 获取群聊最近 N 条消息 */
   async _getGroupHistory(count) {
     const msgs = await this._getGroupHistoryRaw(count)
     if (!msgs) return null
-    return this._formatGroupHistory(msgs)
-  }
-
-  /** 从群聊原始消息中提取所有发送者 ID */
-  _extractUsersFromHistory(rawMsgs) {
-    const userIds = new Set()
-    for (const msg of rawMsgs) {
-      const senderId = msg.sender?.user_id
-      if (senderId && String(senderId) !== String(this.e.self_id)) {
-        userIds.add(String(senderId))
-      }
-    }
-    return userIds
+    return formatGroupHistory(msgs, this._resolveAtName.bind(this), this.e.self_id, cfg.master)
   }
 
   /** 获取当前触发消息中 @ 的其他用户 */
@@ -791,7 +565,7 @@ export class AigcFallback extends plugin {
     if (!rawHistory?.length) return ""
 
     // 提取群聊记录中涉及的所有用户
-    const userIds = this._extractUsersFromHistory(rawHistory)
+    const userIds = extractUsersFromHistory(rawHistory, this.e.self_id)
 
     // 追加当前消息中 @ 的用户
     const atTargets = this._getCurrentAtTargets()
@@ -816,74 +590,6 @@ export class AigcFallback extends plugin {
     return `<group_users_context>\n${userParts.join("\n")}\n</group_users_context>`
   }
 
-  /** 从群聊历史消息段重建完整文本，保留 @/表情/图片/文件 */
-  _extractMsgText(msg) {
-    const message = msg.message
-    if (!message) {
-      return (msg.raw_message || "").replace(/\[CQ:[^\]]+\]/g, "").trim()
-    }
-    if (typeof message === "string") return message
-    if (!Array.isArray(message)) return ""
-
-    const parts = []
-    for (const seg of message) {
-      if (seg.type === "text") {
-        parts.push(seg.text || "")
-      } else if (seg.type === "at") {
-        parts.push(`@${this._resolveAtName(seg.qq)}`)
-      } else if (seg.type === "image") {
-        const url = seg.url || ""
-        parts.push(url ? `[图片](${url})` : "[图片]")
-      } else if (seg.type === "file") {
-        parts.push("[文件]")
-      } else if (seg.type === "face") {
-        const name = faceName(seg.id)
-        parts.push(name ? `[${name}]` : "[表情]")
-      } else if (seg.type === "video") {
-        const url = seg.url || seg.file || ""
-        parts.push(url ? `[视频](${url})` : "[视频]")
-      } else if (seg.type === "record" || seg.type === "audio") {
-        parts.push("[语音]")
-        // } else if (seg.type === "reply") {
-        //   parts.push("[引用]")
-      } else if (seg.type === "json") {
-        const data = typeof seg.data === "string" ? JSON.parse(seg.data) : seg.data || {}
-        const meta = data?.meta?.detail_1 || data?.meta?.detail || data
-        const title = meta?.title || meta?.desc || ""
-        const url = meta?.url || meta?.qqdocurl || ""
-        parts.push(title ? `[小程序: ${title}](${url})` : url ? `[分享](${url})` : "[分享]")
-      } else if (seg.type === "markdown") {
-        parts.push("[Markdown]")
-      } else if (seg.type === "forward") {
-        parts.push("[合并转发]")
-      }
-    }
-    return parts.join("").trim()
-  }
-
-  /** 从 provider 响应构建待持久化的 assistant 消息 */
-  _buildAssistantMsg(res) {
-    return {
-      role: "assistant",
-      content: res.content || null,
-      ...(res.tool_calls && { tool_calls: res.tool_calls }),
-      ...(res.reasoning_content && {
-        reasoning_content: res.reasoning_content,
-      }),
-      ...(res.reasoning_parts && { reasoning_parts: res.reasoning_parts }),
-    }
-  }
-
-  /** 构建 user 消息的公共元数据（时间 + 会话上下文） */
-  _userMsgMeta() {
-    const meta = {
-      time: Date.now(),
-      chat_type: this.e.isGroup ? "群聊" : "私聊",
-    }
-    if (this.e.isGroup) meta.group_name = this.e.group_name || ""
-    return meta
-  }
-
   /** 清理临时标记/过期视频后原子落盘本轮对话，并更新交互 ID
    *  isAmbient 为 true 时直接不落盘 */
   async _persistRound(sessionKey, localPending, stateful, prevIactId, isAmbient = false) {
@@ -903,9 +609,9 @@ export class AigcFallback extends plugin {
    *  - apiMessages[]   每轮实际发送给 API 的消息
    *  有状态模式：通过 previous_interaction_id 让服务端管理上下文。
    *  主动插话：固定无状态 + ambient.model 分流，可用工具/记忆/上下文，但整轮不落盘。 */
-  async _replyLoop(sessionKey, userMsg, images, videos, systemPrompt, signal, isAmbient = false, injectedModel) {
+  async _replyLoop(sessionKey, userMsg, images, videos, systemPrompt, signal, isAmbient = false) {
     const stateful = isAmbient ? false : (cfg.aigc?.gemini?.stateful ?? true)
-    const ambientModel = injectedModel || (isAmbient && cfg.aigc?.ambient?.model) || undefined
+    const ambientModel = (isAmbient && cfg.aigc?.ambient?.model) || undefined
     const replyQuote = !isAmbient // 插话不引用，at 对话引用
     const rawHistory = isAmbient ? [] : await con().getMessages(this.e.self_id, this.e.user_id)
     const baseMessages = rawHistory.filter(m => m.role !== "system")
@@ -918,7 +624,7 @@ export class AigcFallback extends plugin {
     const firstUserMsg = {
       role: "user",
       content: userMsg,
-      ...this._userMsgMeta(),
+      ...userMsgMeta(this.e),
       ...(images ? { images } : {}),
       ...(videos ? { videos } : {}),
     }
@@ -987,7 +693,7 @@ export class AigcFallback extends plugin {
         return this.reply("内容被安全策略拦截", true)
       }
 
-      const assistantMsg = this._buildAssistantMsg(res)
+      const assistantMsg = buildAssistantMsg(res)
       localPending.push(assistantMsg)
 
       // 工具调用
@@ -1085,7 +791,7 @@ export class AigcFallback extends plugin {
         }
 
         // 解析 XML 标签
-        const taggedParts = this._parseTaggedReply(text)
+        const taggedParts = parseTaggedReply(text)
 
         // 落盘
         await this._persistRound(sessionKey, localPending, stateful, prevIactId, isAmbient)
@@ -1134,8 +840,8 @@ export class AigcFallback extends plugin {
         return false
       }
 
-      const taggedParts = this._parseTaggedReply(finalText)
-      localPending.push(this._buildAssistantMsg(finalReply))
+      const taggedParts = parseTaggedReply(finalText)
+      localPending.push(buildAssistantMsg(finalReply))
       await this._persistRound(sessionKey, localPending, stateful, prevIactId, isAmbient)
       if (signal?.aborted) throw new DOMException("Aborted", "AbortError")
       log.warn(`工具轮次超限，降级回复成功`)
