@@ -73,6 +73,8 @@ bilibili_cookie:
 
 # Agent 后台任务子系统
 agent:
+  enable: false # 总开关：关闭时主模型无法派发 Agent 任务
+  master_only: true # 仅主人可使用 Agent 子系统，false 则所有用户可用
   model: "gemini-3.5-flash" # Agent 专用模型，留空走 gemini.model
   max_tokens: 65536 # Agent 输出最大 token 数
   max_rounds: 20 # Agent 思考最大轮次
@@ -92,6 +94,11 @@ agent:
     #     transport: stdio
     #     command: npx
     #     args: ["-y", "@some/mcp-server"]
+
+# 定时任务系统
+scheduled_task:
+  enable: false # 总开关：关闭时无法创建定时任务
+  master_only: true # 仅主人可使用定时任务系统，false 则所有用户可用
 
 # 水群模式：每个群随机冷却时间，冷却期间不会触发，触发也不一定回，LLM自己决定要不要回
 ambient:

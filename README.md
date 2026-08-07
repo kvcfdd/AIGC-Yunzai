@@ -1,14 +1,19 @@
 # AIGC-Yunzai
 
 - 基于 [TRSS-Yunzai](https://github.com/TimeRainStarSky/Yunzai)
-- 融合了 AI 对话引擎(仅Gemini)，让机器人由 LLM 驱动
-  
+- 融合了 AI 对话引擎，让机器人由 LLM 驱动
+
 项目仅供学习交流使用，严禁用于任何商业用途和非法行为
+
+> [tip]
+> 仅适配Gemini
+> 无他，唯白嫖尔...
+> 注：Agent系统会直接在宿主机运行命令，跑脚本等操作，自行判断安全边界，默认不启用
 
 ## 安装教程
 
 > 环境准备：Windows/Linux/MacOS/Android  
-> [Node.js(>=v23.11)](https://nodejs.org), [Valkey](https://valkey.io), [Git](https://git-scm.com)
+> [Node.js(>=v24.16)](https://nodejs.org), [Valkey](https://valkey.io), [Git](https://git-scm.com)
 
 1. Git Clone 项目
 

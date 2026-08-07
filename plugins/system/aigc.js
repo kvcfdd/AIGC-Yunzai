@@ -40,6 +40,12 @@ export class AigcFallback extends plugin {
     })
   }
 
+  /** 输出效验 */
+  _stripQuotePrefix(text) {
+    if (typeof text !== "string" || !text) return text
+    return text.replace(/^\[引用[^\]]*\]\s*/, "").trim()
+  }
+
   /** LLM 回复 → QQ 消息段: @name/@QQ 转为 at，[表情名] 转为表情 */
   _processContent(text) {
     if (typeof text !== "string" || !text) return text
@@ -687,6 +693,9 @@ export class AigcFallback extends plugin {
         return this.reply("内容被安全策略拦截", true)
       }
 
+      // 输出效验: 清除学舌的引用前缀, 再落盘与发送
+      if (res.content) res.content = this._stripQuotePrefix(res.content)
+
       const assistantMsg = buildAssistantMsg(res)
       localPending.push(assistantMsg)
 
@@ -830,6 +839,8 @@ export class AigcFallback extends plugin {
     }
 
     if (finalReply.content) {
+      // 输出效验: 清除学舌的引用前缀, 再落盘与发送
+      finalReply.content = this._stripQuotePrefix(finalReply.content)
       const finalText = (finalReply.content || "").trim()
 
       // no_reply: 不发送回复，但完整落盘
