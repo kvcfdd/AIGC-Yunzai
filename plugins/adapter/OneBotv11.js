@@ -539,6 +539,23 @@ Bot.adapter.push(
       return data.bot.sendApi("_del_group_notice", { group_id: data.group_id, notice_id })
     }
 
+    // 发表QQ空间说说
+    async sendQzoneMsg(data, content, images = [], ugc_right = 1, target_uins = []) {
+      Bot.makeLog("info", `发表QQ空间说说：${Bot.String(content).slice(0, 50)}${images.length ? ` (${images.length}张图)` : ""}`, data.self_id)
+      return data.bot.sendApi("send_qzone_msg", {
+        content,
+        images: await Promise.all(images.map(f => this.makeFile(f))),
+        ugc_right,
+        target_uins,
+      })
+    }
+
+    // 删除QQ空间说说
+    deleteQzoneMsg(data, tid) {
+      Bot.makeLog("info", `删除QQ空间说说：${tid}`, data.self_id)
+      return data.bot.sendApi("delete_qzone_msg", { tid })
+    }
+
     // 标记群聊已读
     markGroupRead(data) {
       return data.bot.sendApi("mark_group_msg_as_read", { group_id: data.group_id })
@@ -610,39 +627,9 @@ Bot.adapter.push(
       return data.bot.sendApi("get_profile_like", { start, count, user_id })
     }
 
-    // 获取图片
-    getImage(data, file) {
-      return data.bot.sendApi("get_image", { file })
-    }
-
-    // 获取语音
-    getRecord(data, file, out_format = "mp3") {
-      return data.bot.sendApi("get_record", { file, out_format })
-    }
-
-    // 检查是否可以发送图片
-    canSendImage(data) {
-      return data.bot.sendApi("can_send_image", {})
-    }
-
-    // 检查是否可以发送语音
-    canSendRecord(data) {
-      return data.bot.sendApi("can_send_record", {})
-    }
-
-    // 下载文件
-    downloadFile(data, url, thread_count = 3, headers) {
-      return data.bot.sendApi("download_file", { url, thread_count, headers })
-    }
-
     // 获取带分组的好友列表
     getFriendsWithCategory(data) {
       return data.bot.sendApi("get_friends_with_category", {})
-    }
-
-    // 检查URL安全性
-    checkUrlSafely(data, url) {
-      return data.bot.sendApi("check_url_safely", { url })
     }
 
     // 图片OCR识别
@@ -780,31 +767,6 @@ Bot.adapter.push(
       return data.bot.sendApi("get_mini_app_ark", params)
     }
 
-    // 获取自定义表情
-    fetchCustomFace(data, params) {
-      return data.bot.sendApi("fetch_custom_face", params)
-    }
-
-    // 获取自定义表情详情
-    fetchCustomFaceDetail(data, params) {
-      return data.bot.sendApi("fetch_custom_face_detail", params)
-    }
-
-    // 添加自定义表情
-    addCustomFace(data, params) {
-      return data.bot.sendApi("add_custom_face", params)
-    }
-
-    // 删除自定义表情
-    deleteCustomFace(data, params) {
-      return data.bot.sendApi("delete_custom_face", params)
-    }
-
-    // 设置自定义表情描述
-    setCustomFaceDesc(data, params) {
-      return data.bot.sendApi("set_custom_face_desc", params)
-    }
-
     // 获取群相册列表
     getQunAlbumList(data, attach_info = "") {
       return data.bot.sendApi("get_qun_album_list", { group_id: data.group_id, attach_info })
@@ -843,12 +805,6 @@ Bot.adapter.push(
     // 发表群相册评论
     doGroupAlbumComment(data, album_id, lloc, content) {
       return data.bot.sendApi("do_group_album_comment", { group_id: data.group_id, album_id, lloc, content })
-    }
-
-    // 英文单词翻译
-    translateEn2Zh(data, words) {
-      if (!Array.isArray(words)) words = [words]
-      return data.bot.sendApi("translate_en2zh", { words })
     }
 
     // 标记消息已读
@@ -1076,15 +1032,8 @@ Bot.adapter.push(
         setSelfLongnick: longNick => this.setSelfLongnick(data, longNick),
 
         getProfileLike: (start, count, user_id) => this.getProfileLike(data, start, count, user_id),
-        getImage: file => this.getImage(data, file),
-        getRecord: (file, out_format) => this.getRecord(data, file, out_format),
         getPrivateFileUrl: (user_id, file_id) => this.getPrivateFileUrl({ ...data, user_id }, file_id),
-        canSendImage: this.canSendImage.bind(this, data),
-        canSendRecord: this.canSendRecord.bind(this, data),
-        downloadFile: (url, thread_count, headers) => this.downloadFile(data, url, thread_count, headers),
-
         getFriendsWithCategory: this.getFriendsWithCategory.bind(this, data),
-        checkUrlSafely: url => this.checkUrlSafely(data, url),
         ocrImage: image => this.ocrImage(data, image),
 
         forwardFriendSingleMsg: (user_id, message_id) => this.forwardFriendSingleMsg(data, user_id, message_id),
@@ -1103,14 +1052,9 @@ Bot.adapter.push(
         fetchPttText: params => this.fetchPttText(data, params),
         getMiniAppArk: params => this.getMiniAppArk(data, params),
 
-        fetchCustomFace: params => this.fetchCustomFace(data, params),
-        fetchCustomFaceDetail: params => this.fetchCustomFaceDetail(data, params),
-        addCustomFace: params => this.addCustomFace(data, params),
-        deleteCustomFace: params => this.deleteCustomFace(data, params),
-        setCustomFaceDesc: params => this.setCustomFaceDesc(data, params),
-
-        translateEn2Zh: words => this.translateEn2Zh(data, words),
         markMsgAsRead: params => this.markMsgAsRead(data, params),
+        sendQzoneMsg: (content, images, ugc_right, target_uins) => this.sendQzoneMsg(data, content, images, ugc_right, target_uins),
+        deleteQzoneMsg: tid => this.deleteQzoneMsg(data, tid),
 
         cookies: {},
         getCookies(domain) {
