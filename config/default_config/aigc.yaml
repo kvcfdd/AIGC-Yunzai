@@ -75,7 +75,7 @@ bilibili_cookie:
 agent:
   enable: false # 总开关：关闭时主模型无法派发 Agent 任务
   master_only: true # 仅主人可使用 Agent 子系统，false 则所有用户可用
-  model: "gemini-3.5-flash" # Agent 专用模型，留空走 gemini.model
+  model: "gemini-3.5-flash" # Agent 专用模型，必填，未配置则 Agent 任务直接失败
   max_tokens: 65536 # Agent 输出最大 token 数
   max_rounds: 20 # Agent 思考最大轮次
   workspace_ttl: 0 # 工作区文件过期时间(秒)，0 不自动清理
@@ -105,7 +105,7 @@ ambient:
   enable: false # 是否启用
   cooldown_min: 30 # 最小冷却，单位分钟
   cooldown_max: 60 # 最大冷却，单位分钟
-  model: gemini-3-flash-preview # 水群模型(记忆总结也用)，留空走全局
+  model: gemini-3-flash-preview # 水群模型(记忆总结也用)，必填，未配置则水群/记忆总结不可用
 
 # 语音合成 (悟声 Wusound TTS)
 voice:

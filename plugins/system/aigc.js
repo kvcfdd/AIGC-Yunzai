@@ -315,6 +315,10 @@ export class AigcFallback extends plugin {
       } else {
         const ambient = cfg.aigc?.ambient
         if (!ambient?.enable) return false
+        if (!ambient?.model) {
+          log.warn(`群 ${gid} 水群未配置模型 (cfg.aigc.ambient.model)，忽略本次插话`)
+          return false
+        }
 
         // @对话后的 5 分钟冷却, 避免群内左脚踩右脚
         if (await redis.get(`aigc:ambient:at_block:${gid}`)) return false
@@ -380,7 +384,7 @@ export class AigcFallback extends plugin {
 
     // 分流模型，影响模型族条件行为
     const mainModel = cfg.aigc?.gemini?.model || ""
-    const effectiveModel = isAmbient && cfg.aigc?.ambient?.model ? cfg.aigc.ambient.model : mainModel
+    const effectiveModel = isAmbient ? cfg.aigc?.ambient?.model : mainModel
 
     try {
       const systemPrompt = await this._buildSystem(finalMsg, effectiveModel, isAmbient)
@@ -483,7 +487,7 @@ export class AigcFallback extends plugin {
       lines.push(`你的群信息: ${botName}(QQ: ${e.self_id}${botRole ? `, ${botRole}` : ""})`)
 
       if (isAmbient) {
-        lines.push("[系统提示] 本次为水群系统触发，请根据群聊中群友们最近的聊天内容自行判断是否参与水群。如果决定参与，请确保回复自然融入；如不想参与，输出 no_reply 即可；如果想参与但不知道说啥可以发个表情包后再输出 no_reply")
+        lines.push("[系统提示] 本次为水群系统触发，请根据群聊中群友们最近的聊天内容自行判断是否参与水群。如果决定参与，请确保回复自然融入；如不想参与，输出 no_reply 即可；如果想参与但不知道说啥可以发个表情包后再输出 no_reply 划水也行，如果话题已被回复过就不要再回复了。")
       } else {
         const card = e.sender?.card || e.sender?.nickname || ""
         const role = { owner: "群主", admin: "群管理员", member: "群成员" }[e.member?.role] || e.member?.role || "群成员"
@@ -614,7 +618,7 @@ export class AigcFallback extends plugin {
    *  主动插话：固定无状态 + ambient.model 分流，可用工具/记忆/上下文，但整轮不落盘。 */
   async _replyLoop(sessionKey, userMsg, images, videos, systemPrompt, signal, isAmbient = false) {
     const stateful = isAmbient ? false : (cfg.aigc?.gemini?.stateful ?? true)
-    const ambientModel = (isAmbient && cfg.aigc?.ambient?.model) || undefined
+    const ambientModel = isAmbient ? cfg.aigc?.ambient?.model : undefined
     const replyQuote = !isAmbient // 插话不引用，at 对话引用
     const rawHistory = isAmbient ? [] : await con().getMessages(this.e.self_id, this.e.user_id)
     const baseMessages = rawHistory.filter(m => m.role !== "system")
@@ -663,6 +667,7 @@ export class AigcFallback extends plugin {
         stateful,
         tools: tools().getDefinitions(),
         tool_choice: "auto",
+        channel: isAmbient ? "ambient" : "main",
       }
       if (ambientModel) opts.model = ambientModel
       if (stateful && prevIactId) {
@@ -827,7 +832,7 @@ export class AigcFallback extends plugin {
     const finalMessages = stateful && prevIactId ? [systemMsg, ...unsentTools] : [systemMsg, ...baseMessages, ...localPending]
     for (const m of unsentTools) m._sent = true
 
-    const finalOpts = { signal, stateful, tool_choice: "none" }
+    const finalOpts = { signal, stateful, tool_choice: "none", channel: isAmbient ? "ambient" : "main" }
     if (ambientModel) finalOpts.model = ambientModel
     if (stateful && prevIactId) {
       finalOpts.previous_interaction_id = prevIactId
