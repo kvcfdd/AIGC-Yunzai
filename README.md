@@ -13,7 +13,7 @@
 ## 安装教程
 
 > 环境准备：Windows/Linux/MacOS/Android  
-> [Node.js(>=v24.16)](https://nodejs.org), [Valkey](https://valkey.io), [Git](https://git-scm.com)
+> [Node.js(>=v24.16)](https://nodejs.org), [Valkey](https://valkey.io), [Git](https://git-scm.com), [FFmpeg](https://ffmpeg.org)
 
 1. Git Clone 项目
 
