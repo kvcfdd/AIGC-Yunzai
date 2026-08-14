@@ -69,11 +69,12 @@ export class maintTask extends plugin {
     }
 
     const cleanPaths = c.clean_paths || ["data/aigc"]
+    const minAgeMs = (c.clean_min_age_days ?? 3) * 24 * 60 * 60 * 1000
     for (const dir of cleanPaths) {
       const target = path.isAbsolute(dir) ? dir : path.resolve(dir)
       if (existsSync(target)) {
         try {
-          const n = await this._cleanFiles(target)
+          const n = await this._cleanFiles(target, minAgeMs)
           stats.clean.fileCount += n
           stats.clean.ok++
         } catch (err) {
@@ -108,7 +109,7 @@ export class maintTask extends plugin {
     busy = false
   }
 
-  async _cleanFiles(dirPath) {
+  async _cleanFiles(dirPath, minAgeMs = 0) {
     let count = 0
     let items = []
     try {
@@ -117,12 +118,16 @@ export class maintTask extends plugin {
       logger.warn(`[${this.name}] 无法读取 ${dirPath}: ${err.message}`)
       return 0
     }
+    const now = Date.now()
     for (const item of items) {
       const full = path.join(dirPath, item.name)
       if (item.isDirectory()) {
-        count += await this._cleanFiles(full)
+        count += await this._cleanFiles(full, minAgeMs)
       } else {
         try {
+          const stat = await fs.stat(full)
+          const existMs = stat.birthtimeMs || stat.ctimeMs
+          if (existMs && minAgeMs > 0 && now - existMs < minAgeMs) continue
           await fs.unlink(full)
           count++
         } catch (err) {

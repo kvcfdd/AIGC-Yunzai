@@ -1,0 +1,32 @@
+# Agent 后台任务子系统
+# 总开关：关闭时主模型无法派发 Agent 任务
+enable: false
+# 用户白名单: 仅主人 + 名单内用户可使用 Agent 子系统
+qq_whitelist:
+#  - 123456789
+
+# Agent 专用模型，必填，未配置则 Agent 任务直接失败
+model: "gemini-3.5-flash"
+# Agent 输出最大 token 数
+max_tokens: 65536
+# Agent 思考最大轮次
+max_rounds: 20
+# 工作区文件过期时间(秒)，0 不自动清理
+workspace_ttl: 0
+# 单文件大小上限(MB)
+workspace_max_file_mb: 50
+# 工作区总大小上限(MB)
+workspace_max_total_mb: 500
+# Agent MCP 工具服务器
+mcp:
+  servers: []
+  # Streamable HTTP:
+  #   - name: agent-tools
+  #     transport: http
+  #     url: http://localhost:3100/mcp
+  #     api_key: ""
+  # stdio:
+  #   - name: agent-local
+  #     transport: stdio
+  #     command: npx
+  #     args: ["-y", "@some/mcp-server"]

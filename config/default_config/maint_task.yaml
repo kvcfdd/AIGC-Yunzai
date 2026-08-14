@@ -12,6 +12,9 @@ git_paths:
 clean_paths:
   - "data/aigc"
 
+# 文件最小存在时长(天)：仅删除已存在超过该时长的文件，0 表示不限制
+clean_min_age_days: 3
+
 # Git 命令超时 (毫秒)
 timeout: 120000
 

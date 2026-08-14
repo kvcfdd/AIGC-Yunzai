@@ -3,11 +3,16 @@ enable: false
 
 # Google Gemini
 gemini:
-  endpoint: https://generativelanguage.googleapis.com # 可替换为兼容 Google Gemini API 的反代地址
-  api_key:  # 多 Key 用英文逗号分隔，如 "xxx,yyy"
-  model: gemini-3.6-flash # 模型
-  stateful: false # 有状态模式：服务端管理上下文
-  thinking_level: medium # 思考等级 minimal, low, medium, high
+  # 可替换为兼容 Google Gemini API 的反代地址
+  endpoint: https://generativelanguage.googleapis.com
+  # 多 Key 用英文逗号分隔，如 "xxx,yyy"
+  api_key: 
+  # 模型
+  model: gemini-3.6-flash
+  # 有状态模式：服务端管理上下文
+  stateful: false
+  # 思考等级 minimal, low, medium, high
+  thinking_level: medium
 
 # 输出最大长度
 max_tokens: 4096
@@ -46,8 +51,10 @@ mcp:
 
 # 本地代理
 proxy:
-  address:  # 代理地址，如 http://127.0.0.1:7890，为空则不启用
-  enable: false # LLM 请求是否走代理
+  # 代理地址，如 http://127.0.0.1:7890，为空则不启用
+  address: 
+  # LLM 请求是否走代理
+  enable: false
 
 # 私聊开关
 private_enable: true
@@ -71,46 +78,34 @@ show_thinking: false
 # B站 Cookie（用于视频搜索和下载，不填则使用匿名会话）
 bilibili_cookie: 
 
-# Agent 后台任务子系统
-agent:
-  enable: false # 总开关：关闭时主模型无法派发 Agent 任务
-  master_only: true # 仅主人可使用 Agent 子系统，false 则所有用户可用
-  model: "gemini-3.5-flash" # Agent 专用模型，必填，未配置则 Agent 任务直接失败
-  max_tokens: 65536 # Agent 输出最大 token 数
-  max_rounds: 20 # Agent 思考最大轮次
-  workspace_ttl: 0 # 工作区文件过期时间(秒)，0 不自动清理
-  workspace_max_file_mb: 50 # 单文件大小上限(MB)
-  workspace_max_total_mb: 500 # 工作区总大小上限(MB)
-  # Agent MCP 工具服务器
-  mcp:
-    servers: []
-    # Streamable HTTP:
-    #   - name: agent-tools
-    #     transport: http
-    #     url: http://localhost:3100/mcp
-    #     api_key: ""
-    # stdio:
-    #   - name: agent-local
-    #     transport: stdio
-    #     command: npx
-    #     args: ["-y", "@some/mcp-server"]
-
 # 定时任务系统
 scheduled_task:
-  enable: false # 总开关：关闭时无法创建定时任务
-  master_only: true # 仅主人可使用定时任务系统，false 则所有用户可用
+  # 总开关：关闭时无法创建定时任务
+  enable: false
+  # 用户白名单: 仅主人 + 名单内用户可使用定时任务系统
+  qq_whitelist:
+  #  - 123456789
 
 # 水群模式：每个群随机冷却时间，冷却期间不会触发，触发也不一定回，LLM自己决定要不要回
 ambient:
-  enable: false # 是否启用
-  cooldown_min: 30 # 最小冷却，单位分钟
-  cooldown_max: 60 # 最大冷却，单位分钟
-  model: gemini-3-flash-preview # 水群模型(记忆总结也用)，必填，未配置则水群/记忆总结不可用
+  # 是否启用
+  enable: false
+  # 最小冷却，单位分钟
+  cooldown_min: 30
+  # 最大冷却，单位分钟
+  cooldown_max: 60
+  # 水群模型(记忆总结/搜索工具也用)，必填，未配置则水群/记忆总结/搜索总结不可用
+  model: gemini-3-flash-preview
 
 # 语音合成 (悟声 Wusound TTS)
 voice:
-  api_key:  # 悟声 API Key，在 https://dev.wusound.cn 开发者中心获取
-  voice_id:  # 默认语音角色 UUID
-  break_clone: true # 是否启用启用偏向文本的情感风格
-  preset: balance # 参数预设: creative(创意/最佳表现力) | balance(均衡) | stable(稳定)
-  speech_rate: 1 # 语速 0.5-2.0，越大越慢
+  # 悟声 API Key，在 https://dev.wusound.cn 开发者中心获取
+  api_key: 
+  # 默认语音角色 UUID
+  voice_id: 
+  # 是否启用启用偏向文本的情感风格
+  break_clone: true
+  # 参数预设: creative(创意/最佳表现力) | balance(均衡) | stable(稳定)
+  preset: balance
+  # 语速 0.5-2.0，越大越慢
+  speech_rate: 1
