@@ -1164,9 +1164,6 @@ Bot.adapter.push(
       for (const seg of data.message) {
         if (seg.type !== "file") continue
 
-        const preName = (seg.name || seg.file || "").toLowerCase()
-        if (!preName.endsWith(".json")) continue
-
         if (seg.url) continue
         const file_id = seg.file_id || seg.file || seg.id
         if (!file_id) continue
