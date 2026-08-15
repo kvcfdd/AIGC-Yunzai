@@ -3,6 +3,7 @@ import common from "../../lib/common/common.js"
 import log from "../../lib/aigc/helpers/log.js"
 import { yesterdayStr } from "../../lib/aigc/conversation.js"
 import { summarizeOne, dailyMemoryJob } from "../../lib/aigc/helpers/memory.js"
+import { WEEKDAYS } from "../../lib/aigc/helpers/time.js"
 import { AigcChatCore, activeRequests, registerInjectedChat } from "../../lib/aigc/chat/index.js"
 
 const con = () => Bot.aigc.conversation
@@ -118,10 +119,9 @@ export class AigcFallback extends AigcChatCore {
     const entries = await con().getMemoryEntries(this.e.self_id, this.e.user_id)
     if (!entries?.length) return this.reply("暂无记忆记录", true)
 
-    const WEEKDAY = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
     const nodes = entries.map(e => {
       const [y, m, d] = e.date.split("-").map(Number)
-      const w = WEEKDAY[new Date(y, m - 1, d).getDay()]
+      const w = WEEKDAYS[new Date(y, m - 1, d).getDay()]
       return { type: "text", data: { text: `${e.date} ${w}\n${e.summary}` } }
     })
 

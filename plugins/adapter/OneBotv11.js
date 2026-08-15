@@ -9,6 +9,8 @@ Bot.adapter.push(
     path = this.name
     echo = new Map()
     timeout = 180000
+    seen = new Map()
+    seenTimeout = 100
 
     makeLog(msg) {
       return Bot.String(msg).replace(/base64:\/\/.*?(,|]|")/g, "base64://...$1")
@@ -1433,6 +1435,18 @@ Bot.adapter.push(
       }
     }
 
+    isDuplicate(data) {
+      if (data.post_type !== "message" && data.post_type !== "message_sent") return false
+      const id = data.message_id
+      if (id === undefined || id === null) return false
+      const key = `${data.self_id}:${data.post_type}:${data.message_type || ""}:${id}`
+      const now = Date.now()
+      if (this.seen.has(key)) return true
+      if (this.seen.size > 64) for (const [k, t] of this.seen) if (now - t > this.seenTimeout) this.seen.delete(k)
+      this.seen.set(key, now)
+      return false
+    }
+
     message(data, ws) {
       try {
         data = { ...JSON.parse(data), raw: Bot.String(data) }
@@ -1446,6 +1460,11 @@ Bot.adapter.push(
           return false
         }
         data.bot = Bot[data.self_id]
+
+        if (this.isDuplicate(data)) {
+          Bot.makeLog("debug", `重复上报，忽略消息：${data.message_id}`, data.self_id)
+          return false
+        }
 
         switch (data.post_type) {
           case "meta_event":
