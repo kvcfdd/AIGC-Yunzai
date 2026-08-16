@@ -19,9 +19,7 @@
 - 渲染器: 更换为 `playwright`，同时解耦 chromium 与 渲染，chromium 作为公共实例存在，可被插件使用，以减少资源浪费
 - 移除: 复读.js, install.js
 
-## AI 简单说明
-
-<details><summary>>>>点击展开<<<</summary>
+<details><summary>AI 简单说明</summary>
 
 接入 Gemini 大模型，让 bot 能聊天、能看能听、能干活
 
