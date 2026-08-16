@@ -1,7 +1,8 @@
 # 3.2.2
 
-* 新增 GSUIDClient 适配器，直连 早柚核心
-* 废弃除 OneBotv11 外的其余平台适配器
+* 新增 `GSUIDClient` 适配器，直连 早柚核心
+* 废弃除 `OneBotv11` 外的其余平台适配器
+* `skills` 支持
 
 # 3.2.1
 

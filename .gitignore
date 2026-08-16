@@ -1,5 +1,6 @@
 /config/*
 !/config/default_config
+!/config/skills
 /knowledge.md
 /logs
 /node_modules
