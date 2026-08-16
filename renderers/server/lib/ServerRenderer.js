@@ -17,6 +17,7 @@ export default class ServerRenderer extends Renderer {
     this.queue = []
     this.activeCount = 0
     this.maxConcurrency = config.maxConcurrency || 2 // 最大并发数
+    this.style = config.injectGlobalStyle !== undefined ? config.injectGlobalStyle : true // 默认注入全局样式
 
     this.init()
   }
@@ -64,7 +65,7 @@ export default class ServerRenderer extends Renderer {
           }
 
           // 注入全局美颜 CSS
-          if (this.config.injectGlobalStyle) {
+          if (this.style) {
             await page.addStyleTag({ content: globalStyle })
           }
 

@@ -7,9 +7,9 @@ export const globalStyle = `
     /* 
       稍微加一点对比度和饱和度，去灰 
       saturate(1.15): 饱和度 +15%
-      contrast(1.08): 对比度 +8%
+      contrast(1.15): 对比度 +15%
     */
-    filter: contrast(1.05) saturate(1.1);
+    filter: contrast(1.15) saturate(1.15);
     
     /* 保证缩放时的图片质量 */
     image-rendering: -webkit-optimize-contrast;
@@ -17,10 +17,10 @@ export const globalStyle = `
 
   body {
     /* 
-      给字体加 0.15px 的描边，模拟 Windows 的厚重感 
+      给字体加 0.13px 的描边，模拟 Windows 的厚重感 
       currentColor 会自动跟随文字颜色，不会破坏插件原有配色
     */
-    -webkit-text-stroke: 0.15px currentColor;
+    -webkit-text-stroke: 0.13px currentColor;
     
     /* 开启抗锯齿 */
     -webkit-font-smoothing: antialiased;

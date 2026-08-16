@@ -17,6 +17,7 @@ export default class Playwright extends Renderer {
     this.config = config
     this.activeTaskCount = 0 // 活跃任务数
     this.scale = config.scale || 1.5 // 缩放比例
+    this.style = config.injectGlobalStyle !== undefined ? config.injectGlobalStyle : true // 默认注入全局样式
 
     // 并发控制
     this.queue = []
@@ -88,7 +89,7 @@ export default class Playwright extends Renderer {
       const fileUrl = pathToFileURL(path.join(_path, savePath)).href
       await page.goto(fileUrl, { waitUntil: "networkidle" })
       // 注入全局样式
-      if (this.config.injectGlobalStyle) {
+      if (this.style) {
         await page.addStyleTag({ content: globalStyle })
       }
       // 定位元素

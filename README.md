@@ -11,7 +11,7 @@
 - AI框架集成: ai对话，一些简单的任务实现等
 - 定时任务: 定时清理/更新git仓库/代理配置更新(仅Linux)
 - 好友申请/群邀请可通知/手动处理
-- 渲染器server: 可被非yunzai生态的项目使用，默认挂载到 http://localhost:1134
+- 渲染器server: 可被非yunzai生态的项目使用，默认挂载到 1134 端口
 
 ## 改动
 
@@ -19,7 +19,9 @@
 - 渲染器: 更换为 `playwright`，同时解耦 chromium 与 渲染，chromium 作为公共实例存在，可被插件使用，以减少资源浪费
 - 移除: 复读.js, install.js
 
-<details><summary>AI 简单说明</summary>
+## AI
+
+<details><summary>简要说明</summary>
 
 接入 Gemini 大模型，让 bot 能聊天、能看能听、能干活
 
@@ -51,6 +53,8 @@
 - FFmpeg 在AI架构中多处使用，未安装可能会有很多问题，而后台任务时大概率会跑 Python 脚本，未安装也可能有一些问题(它也有可能自己给你装了)
 
 </details>
+
+---
 
 ## 安装教程
 
