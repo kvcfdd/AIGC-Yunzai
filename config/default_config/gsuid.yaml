@@ -1,0 +1,27 @@
+# 早柚核心连接适配器
+
+# 是否启用连接
+enable: false
+
+# 早柚核心 WS 地址
+url: ws://localhost:8765/ws/yunzai
+
+# 连接 token
+token: 
+
+# 上报给核心的聊天平台标识
+bot_id: onebot
+
+# 断线重连间隔（秒）
+reconnect_interval: 5
+
+# 机器人自身消息是否上报
+forward_self_msg: false
+
+# 上报过滤：消息开头和结尾同时配置时，两者都符合才不上报；仅配置一项时只匹配该项
+no_report_start:
+#  - 开头文本1
+#  - 开头文本2
+no_report_end:
+#  - 结尾文本1
+#  - 结尾文本2
