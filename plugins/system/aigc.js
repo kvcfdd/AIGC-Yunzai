@@ -168,10 +168,6 @@ export class AigcFallback extends AigcChatCore {
       } else {
         const ambient = cfg.aigc?.ambient
         if (!ambient?.enable) return false
-        if (!ambient?.model) {
-          log.warn(`群 ${gid} 水群未配置模型 (cfg.aigc.ambient.model)，忽略本次插话`)
-          return false
-        }
 
         // @对话后的 5 分钟冷却, 避免群内左脚踩右脚
         if (await redis.get(`aigc:ambient:at_block:${gid}`)) return false

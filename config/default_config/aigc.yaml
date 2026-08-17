@@ -15,9 +15,7 @@ gemini:
   thinking_level: medium
 
 # 输出最大长度
-max_tokens: 4096
-# 输出随机程度 (0-2，值越大输出越随机)
-temperature: 1
+max_tokens: 8096
 # 工具调用轮次上限 (2-10)
 max_tool_rounds: 5
 # 请求失败重试次数 (0-10, 0不重试)
@@ -73,6 +71,7 @@ prefix_filter:
 # 群聊记录携带条数，0 则不携带
 group_history_count: 30
 # 是否将思维链以合并转发方式单独发送
+# 可能存在问题，非必要勿开
 show_thinking: false
 
 # B站 Cookie（用于视频搜索和下载，不填则使用匿名会话）
@@ -94,7 +93,7 @@ ambient:
   cooldown_min: 30
   # 最大冷却，单位分钟
   cooldown_max: 60
-  # 水群模型(记忆总结/搜索工具也用)，必填，未配置则水群/记忆总结/搜索总结不可用
+  # 水群模型(记忆总结/搜索工具也用)
   model: gemini-3-flash-preview
 
 # 语音合成 (悟声 Wusound TTS)

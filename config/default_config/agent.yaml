@@ -5,8 +5,8 @@ enable: false
 qq_whitelist:
 #  - 123456789
 
-# Agent 专用模型，必填，未配置则 Agent 任务直接失败
-model: gemini-3.5-flash
+# Agent 模型
+model: gemini-3.7-flash
 # Agent 输出最大 token 数
 max_tokens: 65536
 # Agent 思考最大轮次
