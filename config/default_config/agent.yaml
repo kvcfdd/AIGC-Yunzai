@@ -8,7 +8,7 @@ qq_whitelist:
 # Agent 模型
 model: gemini-3.7-flash
 # Agent 输出最大 token 数
-max_tokens: 65536
+max_tokens: 8192
 # Agent 思考最大轮次
 max_rounds: 20
 # Agent 系统提示词

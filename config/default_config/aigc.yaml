@@ -15,7 +15,7 @@ gemini:
   thinking_level: medium
 
 # 输出最大长度
-max_tokens: 8096
+max_tokens: 8192
 # 工具调用轮次上限 (2-10)
 max_tool_rounds: 5
 # 请求失败重试次数 (0-10, 0不重试)

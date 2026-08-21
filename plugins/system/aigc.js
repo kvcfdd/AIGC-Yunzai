@@ -4,7 +4,7 @@ import log from "../../lib/aigc/helpers/log.js"
 import { yesterdayStr } from "../../lib/aigc/conversation.js"
 import { summarizeOne, dailyMemoryJob } from "../../lib/aigc/helpers/memory.js"
 import { WEEKDAYS } from "../../lib/aigc/helpers/time.js"
-import { AigcChatCore, activeRequests, registerInjectedChat } from "../../lib/aigc/chat/index.js"
+import { AigcChatCore, activeRequests, reqKey, registerInjectedChat } from "../../lib/aigc/chat/index.js"
 
 const con = () => Bot.aigc.conversation
 
@@ -49,7 +49,7 @@ export class AigcFallback extends AigcChatCore {
   // 对话清除
   async clearConv() {
     // 终止该用户进行中的请求
-    const req = activeRequests.get(this.e.user_id)
+    const req = activeRequests.get(reqKey(this.e))
     if (req) {
       req.controller.abort()
       log.info(`用户 ${this.e.user_id} 结束对话，已中止进行中的请求`)
@@ -67,9 +67,9 @@ export class AigcFallback extends AigcChatCore {
     if (!this.e.isMaster) return false
 
     // 终止所有进行中的请求
-    for (const [user_id, req] of activeRequests) {
+    for (const [key, req] of activeRequests) {
       req.controller.abort()
-      log.info(`管理员清除全部对话，已中止用户 ${user_id} 进行中的请求`)
+      log.info(`管理员清除全部对话，已中止用户 ${key.split(":").pop()} 进行中的请求`)
     }
 
     await con().clearAll()
