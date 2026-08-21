@@ -281,7 +281,7 @@ Bot.adapter.push(
           case "buttons":
           case "template_buttons":
           case "template_markdown":
-            Bot.makeLog("warn", `当前协议端不支持 ${msg.type} 消息，已跳过`)
+            Bot.makeLog("debug", `当前协议端不支持 ${msg.type} 消息，已跳过`)
             break
           default:
             break
@@ -321,14 +321,14 @@ Bot.adapter.push(
         const bot = Bot[data.bot_self_id] || Bot
         const isDirect = data.target_type === "direct"
         const target = isDirect ? bot.pickFriend(data.target_id) : bot.pickGroup(data.target_id)
-        if (!target) return Bot.makeLog("error", ["发送目标不存在", data.target_type, data.target_id], data.bot_self_id)
+        if (!target) return Bot.makeLog("debug", ["发送目标不存在", data.target_type, data.target_id], data.bot_self_id)
 
         const sendMsg = []
         for (const msg of data.content || []) {
           if (msg.type === "file") {
             const [name, content] = String(msg.data).split("|")
             if (!content) {
-              Bot.makeLog("warn", ["文件数据格式错误", this.makeLog(msg.data)], data.bot_self_id)
+              Bot.makeLog("debug", ["文件数据格式错误", this.makeLog(msg.data)], data.bot_self_id)
               continue
             }
             const file = content.startsWith("link://") ? await Bot.Buffer(content.slice(7), { http: true, size: 10485760 }) : Buffer.from(content, "base64")
@@ -359,8 +359,8 @@ Bot.adapter.push(
       if (mid == null) return
       const bot = Bot[data.bot_self_id] || Bot
       const target = data.target_type === "direct" ? bot.pickFriend?.(data.target_id) : bot.pickGroup?.(data.target_id)
-      if (!target?.recallMsg) return Bot.makeLog("warn", ["当前协议端不支持撤回", data.content[0].data], data.bot_self_id)
-      await target.recallMsg(String(mid)).catch(err => Bot.makeLog("error", ["撤回失败", mid, err], data.bot_self_id))
+      if (!target?.recallMsg) return Bot.makeLog("debug", ["当前协议端不支持撤回", data.content[0].data], data.bot_self_id)
+      await target.recallMsg(String(mid)).catch(err => Bot.makeLog("debug", ["撤回失败", mid, err], data.bot_self_id))
     }
 
     // 禁言控制包
@@ -370,8 +370,8 @@ Bot.adapter.push(
       if (!(Number.isInteger(duration) || (typeof duration === "string" && /^\d+$/.test(duration)))) return
       const bot = Bot[data.bot_self_id] || Bot
       const group = bot.pickGroup?.(String(group_id))
-      if (!group?.muteMember) return Bot.makeLog("warn", ["当前协议端不支持禁言", data.content[0].data], data.bot_self_id)
-      await group.muteMember(Number(user_id), Number(duration)).catch(err => Bot.makeLog("error", ["禁言失败", user_id, err], data.bot_self_id))
+      if (!group?.muteMember) return Bot.makeLog("debug", ["当前协议端不支持禁言", data.content[0].data], data.bot_self_id)
+      await group.muteMember(Number(user_id), Number(duration)).catch(err => Bot.makeLog("debug", ["禁言失败", user_id, err], data.bot_self_id))
     }
 
     // 接收核心下发的指令
@@ -379,7 +379,7 @@ Bot.adapter.push(
       try {
         data = JSON.parse(Buffer.isBuffer(data) ? data.toString() : data)
       } catch (err) {
-        return Bot.makeLog("error", ["解码数据失败", data, err])
+        return Bot.makeLog("debug", ["解码数据失败", data, err])
       }
       const first = data.content?.[0]
       if (first?.type?.startsWith?.("log") && (!this.routeId() || data.bot_id === this.routeId())) {
@@ -392,7 +392,7 @@ Bot.adapter.push(
         if (first.type === "excute_delete_message") return await this.recall(data)
         if (first.type === "excute_ban_user") return await this.ban(data)
       }
-      await this.send(data).catch(err => Bot.makeLog("error", ["发送指令执行失败", data, err], data?.bot_self_id))
+      await this.send(data).catch(err => Bot.makeLog("debug", ["发送指令执行失败", data, err], data?.bot_self_id))
     }
 
     // 元事件上报
@@ -463,10 +463,15 @@ Bot.adapter.push(
       if (!forward_self_msg && e.user_id === e.self_id) return
       // 开头/结尾过滤
       if (this.noReport(no_report_start, no_report_end, e)) return
-      const report = await this.report(e).catch(err => Bot.makeLog("error", ["上报消息失败", err], e.self_id))
+      const report = await this.report(e).catch(err => Bot.makeLog("debug", ["上报消息失败", err], e.self_id))
       if (!report) return
       Bot.makeLog("debug", ["上报消息", this.makeLog(report)], `${e.self_id} <= ${e.user_id}`, true)
       this.ws.send(Buffer.from(JSON.stringify(report)))
+    }
+
+    // 连接状态变化
+    notifyAdmin(msg) {
+      Bot.sendMasterMsg?.(msg).catch(() => {})
     }
 
     // 连接早柚核心
@@ -478,17 +483,20 @@ Bot.adapter.push(
       try {
         this.ws = new WebSocket(address)
       } catch (err) {
-        return Bot.makeLog("error", ["早柚核心地址错误", address, err], this.id)
+        return Bot.makeLog("debug", ["早柚核心地址错误", address, err], this.id)
       }
       this.ws.on("open", () => {
         this.status = 1
-        Bot.makeLog("mark", `早柚核心已连接：${address}`, this.id)
+        Bot.makeLog("info", `早柚核心已连接：${address}`, this.id)
+        this.notifyAdmin("gsuid_core已连接")
       })
       this.ws.on("message", data => this.message(data))
       this.ws.on("close", code => {
+        const wasConnected = this.status === 1
         this.status = 0
         const { enable, reconnect_interval } = this.getCfg()
-        Bot.makeLog("warn", `早柚核心已断开：${code}${enable ? `，${reconnect_interval}秒后重连` : ""}`, this.id)
+        Bot.makeLog("info", `早柚核心已断开：${code}${enable ? `，${reconnect_interval}秒后重连` : ""}`, this.id)
+        if (wasConnected) this.notifyAdmin("gsuid_core已断开")
         if (enable) this.reconnect = setTimeout(() => this.connect(), reconnect_interval * 1000)
       })
       this.ws.on("error", () => {})
