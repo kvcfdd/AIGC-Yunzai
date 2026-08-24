@@ -33,6 +33,15 @@ export class AigcFallback extends AigcChatCore {
     })
   }
 
+  // 空文本消息兜底：e.msg 为空时，有媒体段允许进入对话
+  accept(e) {
+    if (!e.msg && (e.img?.length || e.video?.length || e.audio || e.file || (e.atBot && cfg.aigc?.bare_at_reply === true))) {
+      const res = this.aigcChat()
+      return res ? "return" : false
+    }
+    return false
+  }
+
   // 全局开关
   async aigcOff() {
     if (!this.e.isMaster) return false

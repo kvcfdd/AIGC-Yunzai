@@ -56,6 +56,8 @@ proxy:
 
 # 私聊开关
 private_enable: true
+# 群里裸 @bot 是否触发LLM
+bare_at_reply: false
 # 群白名单
 group_whitelist:
 #  - 123456789
