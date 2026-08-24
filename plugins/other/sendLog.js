@@ -64,8 +64,6 @@ export class sendLog extends plugin {
     for (let i of log) {
       if (!i) continue
       if (this.keyWord && tmp.length >= this.maxNum) return
-      /* eslint-disable no-control-regex */
-      i = i.replace(/\x1b[[0-9;]*m/g, "")
       i = i.replace(/\r|\n/, "")
       tmp.push(i)
     }

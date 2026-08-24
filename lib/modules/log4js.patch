@@ -7,6 +7,24 @@
    return (loggingEvent) => {
 -    process.stderr.write(`${layout(loggingEvent, timezoneOffset)}\n`);
 +    process.stderr.write(`${layout(loggingEvent, timezoneOffset).replace(reg, i => rep[i])}\n`);
+--- a/lib/appenders/dateFile.js
++++ b/lib/appenders/dateFile.js
+@@ -38,7 +38,15 @@
+   const app = function (logEvent) {
+     if (!writer.writable) {
+       return;
+     }
++    if (options.removeColor === true) {
++      // eslint-disable-next-line no-control-regex
++      const regex = /\x1b[[0-9;]*m/g;
++      logEvent.data = logEvent.data.map((d) => {
++        if (typeof d === 'string') return d.replace(regex, '');
++        return d;
++      });
++    }
+     if (!writer.write(layout(logEvent, timezoneOffset) + eol, 'utf8')) {
+       process.emit('log4js:pause', true);
+     }
 --- a/lib/appenders/stdout.js
 +++ b/lib/appenders/stdout.js
 @@ -1,3 +1,5 @@

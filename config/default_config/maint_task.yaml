@@ -11,6 +11,7 @@ git_paths:
 # 清理路径，支持相对路径和绝对路径
 clean_paths:
   - "data/aigc"
+  - "logs"
 
 # 文件最小存在时长(天)：仅删除已存在超过该时长的文件，0 表示不限制
 clean_min_age_days: 3
