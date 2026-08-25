@@ -140,7 +140,7 @@ export class maintTask extends plugin {
 
   async _mihomoUpdate(mihomo) {
     const tmpFile = path.join(os.tmpdir(), `mihomo_${Date.now()}.yaml`)
-    const cmd = `curl -s -A "clash-verge/2.5.1" -o ${tmpFile} "${mihomo.sub_url}"`
+    const cmd = `curl -s -fL -A "clash-verge/2.5.1" -o ${tmpFile} "${mihomo.sub_url}"`
 
     const { error: dlErr } = await Bot.exec(cmd, { timeout: 30000 })
     if (dlErr) return { ok: false, msg: `下载失败: ${dlErr.message}` }
@@ -153,6 +153,10 @@ export class maintTask extends plugin {
       return { ok: false, msg: `YAML解析失败: ${err.message}` }
     } finally {
       await fs.unlink(tmpFile).catch(() => {})
+    }
+
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+      return { ok: false, msg: "订阅内容为空或格式异常，请检查订阅链接" }
     }
 
     const regex = new RegExp(mihomo.exclude_regex || "$^", "i")

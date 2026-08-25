@@ -33,9 +33,9 @@ export class AigcFallback extends AigcChatCore {
     })
   }
 
-  // 空文本消息兜底：e.msg 为空时，有媒体段允许进入对话
+  // 裸 @ 是否进入对话
   accept(e) {
-    if (!e.msg && (e.img?.length || e.video?.length || e.audio || e.file || (e.atBot && cfg.aigc?.bare_at_reply === true))) {
+    if (!e.msg && e.atBot && cfg.aigc?.bare_at_reply) {
       const res = this.aigcChat()
       return res ? "return" : false
     }
@@ -144,6 +144,12 @@ export class AigcFallback extends AigcChatCore {
   async aigcChat() {
     if (cfg.aigc?.enable === false) return false
     if (this.e.isPrivate && cfg.aigc?.private_enable === false && !this.e.isMaster) return false
+
+    // 仅真好友私聊触发，协议端会把公众号推送当成私聊上报
+    if (this.e.isPrivate && !this.e._injected) {
+      const fl = this.e.bot?.fl
+      if (fl && !fl.has(this.e.user_id)) return false
+    }
 
     // 黑名单检查
     const blacklist = cfg.aigc?.qq_blacklist
