@@ -16,7 +16,7 @@
 ## 改动
 
 - 适配器: 只保留 `OneBotv11,  GSUIDClient, stdin` 适配器，`GSUIDClient` 直连 `早柚核心`，`OneBotv11` 适配更多接口(移除频道接口)
-- 渲染器: 更换为 `playwright`，同时解耦 chromium 与 渲染，chromium 作为公共实例存在，可被插件使用，以减少资源浪费
+- 渲染器: 更换为 `playwright`，同时解耦 chromium 与 渲染，chromium 作为公共实例存在，可被插件使用，以减少资源浪费 (需注意: 使用[ZZZ-Plugin](https://github.com/ZZZure/ZZZ-Plugin)插件时需要将渲染精度调整至50，不然协议端会爆炸的...)
 - 移除: 复读.js, install.js, add.js
 
 ## AI
