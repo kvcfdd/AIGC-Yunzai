@@ -140,9 +140,35 @@ export class AigcFallback extends AigcChatCore {
 
   // AIGC 对话主流程
 
+  /** 当前消息是否为无文本的文件消息；是则返回文件名，否则 null。
+   *  "裸文件" = 消息仅含文件段，无任何文本内容 */
+  _getBareFileName() {
+    const segs = this.e.message
+    if (!Array.isArray(segs)) return null
+    let fileSeg = null
+    for (const seg of segs) {
+      if (seg.type === "text" && seg.text?.trim()) return null
+      if (seg.type === "file" && !fileSeg) fileSeg = seg
+    }
+    return fileSeg?.name || null
+  }
+
   /** 门控与入口：开关/黑白名单/水群判定 → 交引擎执行对话 */
   async aigcChat() {
     if (cfg.aigc?.enable === false) return false
+
+    // 一次性拦截: pc端接收文件协议端会将其上报，将其拦下避免触发
+    const bareFile = this._getBareFileName()
+    if (bareFile) {
+      const chat = this.e.isGroup ? `g:${this.e.group_id}` : `p:${this.e.user_id}`
+      const fkey = `aigc:file_sent:${this.e.self_id}:${chat}:${bareFile}`
+      if (await redis.get(fkey)) {
+        await redis.del(fkey)
+        log.debug(`用户 ${this.e.user_id} 发送裸文件 ${bareFile} 命中，跳过对话`)
+        return false
+      }
+    }
+
     if (this.e.isPrivate && cfg.aigc?.private_enable === false && !this.e.isMaster) return false
 
     // 仅真好友私聊触发，协议端会把公众号推送当成私聊上报
