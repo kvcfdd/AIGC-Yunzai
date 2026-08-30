@@ -28,7 +28,7 @@ export class AigcFallback extends AigcChatCore {
         { reg: /^#我的记忆$/i, fnc: "myMemory" },
         { reg: /^#清除记忆$/i, fnc: "clearMemory" },
         { reg: /^#清除全部记忆$/i, fnc: "clearAllMemory", permission: "master" },
-        { reg: /^(.+)$/, fnc: "aigcChat", log: false },
+        { reg: /^[\s\S]+$/, fnc: "aigcChat", log: false },
       ],
     })
   }
