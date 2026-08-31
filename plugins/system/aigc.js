@@ -157,11 +157,10 @@ export class AigcFallback extends AigcChatCore {
   async aigcChat() {
     if (cfg.aigc?.enable === false) return false
 
-    // 一次性拦截: pc端接收文件协议端会将其上报，将其拦下避免触发
-    const bareFile = this._getBareFileName()
+    // 一次性拦截: 接收文件协议端会将其上报，将其拦下避免触发
+    const bareFile = this.e.isPrivate ? this._getBareFileName() : null
     if (bareFile) {
-      const chat = this.e.isGroup ? `g:${this.e.group_id}` : `p:${this.e.user_id}`
-      const fkey = `aigc:file_sent:${this.e.self_id}:${chat}:${bareFile}`
+      const fkey = `aigc:file_sent:${this.e.self_id}:${this.e.user_id}:${bareFile}`
       if (await redis.get(fkey)) {
         await redis.del(fkey)
         log.debug(`用户 ${this.e.user_id} 发送裸文件 ${bareFile} 命中，跳过对话`)
