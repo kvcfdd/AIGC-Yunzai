@@ -1,6 +1,7 @@
 import Renderer from "../../../lib/renderer/Renderer.js"
 import { globalStyle } from "../../style.js"
 import browser from "../../../lib/renderer/browser.js"
+import sharp from "sharp"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 
@@ -87,7 +88,7 @@ export default class Playwright extends Renderer {
 
       // 加载页面
       const fileUrl = pathToFileURL(path.join(_path, savePath)).href
-      await page.goto(fileUrl, { waitUntil: "networkidle" })
+      await page.goto(fileUrl, { waitUntil: "domcontentloaded" })
       // 注入全局样式
       if (this.style) {
         await page.addStyleTag({ content: globalStyle })
@@ -104,8 +105,26 @@ export default class Playwright extends Renderer {
       }
       const target = (await locator.count()) > 0 ? locator : page.locator("body")
 
-      const box = await target.boundingBox()
+      // 等待字体就绪, 避免截图时字体未加载完
+      await page.evaluate(() => document.fonts.ready)
+      await page.evaluate(async () => {
+        await Promise.all(
+          [...document.images].map(async img => {
+            if (img.complete && img.naturalWidth > 0) return
+            try {
+              await Promise.race([img.decode().catch(() => {}), new Promise(r => setTimeout(r, 3000))])
+            } catch {}
+          }),
+        )
+      })
+
+      let box = await target.boundingBox()
       if (!box) throw new Error("无法获取元素尺寸")
+      if (!box.width || !box.height) {
+        await page.waitForTimeout(100)
+        box = await target.boundingBox()
+        if (!box.width || !box.height) throw new Error("无法获取元素有效尺寸")
+      }
 
       // 设置视口尺寸
       const viewWidth = Math.max(Math.ceil(box.width), 1)
@@ -128,32 +147,58 @@ export default class Playwright extends Renderer {
         buff = []
         const pageHeight = data.pageHeight || 5000
         const totalHeight = box.height
-        const num = Math.ceil(totalHeight / pageHeight)
+        const scale = data.deviceScaleFactor || data.viewport?.deviceScaleFactor || this.scale
+        const MAX_FULL_HEIGHT = 16000
 
-        await page.setViewportSize({
-          width: Math.ceil(box.width),
-          height: pageHeight + 100,
-        })
-
-        for (let i = 0; i < num; i++) {
-          const y = i * pageHeight
-          // 滚动页面触发懒加载
-          await page.evaluate(scrollTop => window.scrollTo(0, scrollTop), y)
-          // 等待渲染稳定
-          await page.waitForTimeout(i === 0 ? 100 : 300)
-
-          const currentSliceHeight = Math.min(pageHeight, totalHeight - y)
-
-          const slice = await page.screenshot({
-            ...screenshotOpts,
-            clip: {
-              x: box.x,
-              y: box.y,
-              width: box.width,
-              height: currentSliceHeight,
-            },
+        if (box.y + totalHeight <= MAX_FULL_HEIGHT) {
+          await page.setViewportSize({
+            width: Math.ceil(box.width),
+            height: Math.ceil(box.y + totalHeight),
           })
-          buff.push(slice)
+          const full = await page.screenshot({
+            ...screenshotOpts,
+            type: "png",
+            quality: undefined,
+            clip: { x: box.x, y: box.y, width: box.width, height: totalHeight },
+          })
+          const image = sharp(full)
+          const { width, height } = await image.metadata()
+          const slicePx = Math.round(pageHeight * scale)
+          const num = Math.ceil(height / slicePx)
+          for (let i = 0; i < num; i++) {
+            const top = Math.min(i * slicePx, height - 1)
+            const sliceHeight = Math.min(slicePx, height - top)
+            const slice = image.clone().extract({ left: 0, top, width, height: sliceHeight })
+            buff.push(isPng ? await slice.png().toBuffer() : await slice.jpeg({ quality: data.quality || 90 }).toBuffer())
+          }
+        } else {
+          const num = Math.ceil(totalHeight / pageHeight)
+
+          await page.setViewportSize({
+            width: Math.ceil(box.width),
+            height: pageHeight + 100,
+          })
+
+          for (let i = 0; i < num; i++) {
+            const y = i * pageHeight
+            // 滚动页面触发懒加载
+            await page.evaluate(scrollTop => window.scrollTo(0, scrollTop), y)
+            // 等待渲染稳定
+            await page.waitForTimeout(i === 0 ? 100 : 300)
+
+            const currentSliceHeight = Math.min(pageHeight, totalHeight - y)
+
+            const slice = await page.screenshot({
+              ...screenshotOpts,
+              clip: {
+                x: box.x,
+                y: box.y,
+                width: box.width,
+                height: currentSliceHeight,
+              },
+            })
+            buff.push(slice)
+          }
         }
       } else {
         // 单图

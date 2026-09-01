@@ -1072,7 +1072,16 @@ Bot.adapter.push(
 
       data.bot.sendApi("_set_model_show", { model: data.bot.model, model_show: data.bot.model }).catch(() => {})
 
-      data.bot.info = (await data.bot.sendApi("get_login_info").catch(i => i.error)).data
+      const loginInfo = (await data.bot.sendApi("get_login_info").catch(() => null))?.data
+      if (loginInfo?.user_id) {
+        data.bot.info = loginInfo
+        if (String(loginInfo.nickname) === String(loginInfo.user_id)) {
+          setTimeout(async () => {
+            const retryInfo = (await data.bot.sendApi("get_login_info").catch(() => null))?.data
+            if (retryInfo?.user_id) data.bot.info = retryInfo
+          }, 5000)
+        }
+      }
       data.bot.clients = (await data.bot.sendApi("get_online_clients").catch(i => i.error)).clients
       data.bot.version = {
         ...(await data.bot.sendApi("get_version_info").catch(i => i.error)).data,
@@ -1106,8 +1115,8 @@ Bot.adapter.push(
         })
         .catch(() => {})
 
-      data.bot.getFriendMap()
-      data.bot.getGroupMemberMap()
+      data.bot.getFriendMap().catch(() => {})
+      data.bot.getGroupMemberMap().catch(() => {})
 
       Bot.makeLog("mark", `${this.name}(${this.id}) ${data.bot.version.version} 已连接`, data.self_id)
       Bot.em(`connect.${data.self_id}`, data)
@@ -1468,6 +1477,7 @@ Bot.adapter.push(
 
         switch (data.post_type) {
           case "meta_event":
+            if (data.meta_event_type === "lifecycle" && Bot[data.self_id]?.ws === ws) return false
             return this.makeMeta(data, ws)
           case "message":
             return this.makeMessage(data)

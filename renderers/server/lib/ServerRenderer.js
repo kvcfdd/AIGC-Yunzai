@@ -59,9 +59,9 @@ export default class ServerRenderer extends Renderer {
           const page = await context.newPage()
 
           if (url) {
-            await page.goto(url, { waitUntil: "networkidle", timeout: 20000 })
+            await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 })
           } else {
-            await page.setContent(html, { waitUntil: "networkidle", timeout: 20000 })
+            await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 20000 })
           }
 
           // 注入全局美颜 CSS
@@ -79,9 +79,26 @@ export default class ServerRenderer extends Renderer {
             target = page.locator("body")
           }
 
+          // 等待字体就绪, 避免截图时字体未加载完
+          await page.evaluate(() => document.fonts.ready)
+          await page.evaluate(async () => {
+            await Promise.all(
+              [...document.images].map(async img => {
+                if (img.complete && img.naturalWidth > 0) return
+                try {
+                  await Promise.race([img.decode().catch(() => {}), new Promise(r => setTimeout(r, 3000))])
+                } catch {}
+              }),
+            )
+          })
+
           // 智能调整视口
-          const size = await target.boundingBox()
-          if (size) {
+          let size = await target.boundingBox()
+          if (size && (!size.width || !size.height)) {
+            await page.waitForTimeout(100)
+            size = await target.boundingBox()
+          }
+          if (size && size.width && size.height) {
             await page.setViewportSize({
               width: Math.max(Math.ceil(size.width), viewport?.width || 800),
               height: Math.max(Math.ceil(size.height), 100),
