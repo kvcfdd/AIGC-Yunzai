@@ -1,60 +1,26 @@
 import Renderer from "../../../lib/renderer/Renderer.js"
 import { globalStyle } from "../../style.js"
 import browser from "../../../lib/renderer/browser.js"
-import sharp from "sharp"
+import cfg from "../../../lib/config/config.js"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 
 const _path = process.cwd()
 
 export default class Playwright extends Renderer {
-  constructor(config = {}) {
+  constructor() {
     super({
       id: "playwright",
       type: "image",
       render: "screenshot",
     })
-
-    this.config = config
-    this.activeTaskCount = 0 // 活跃任务数
-    this.scale = config.scale || 1.5 // 缩放比例
-    this.style = config.injectGlobalStyle !== undefined ? config.injectGlobalStyle : true // 默认注入全局样式
-
-    // 并发控制
-    this.queue = []
-    this.maxConcurrency = config.maxConcurrency || 2
   }
 
   /**
-   * 截图入口，包含并发控制
+   * 截图入口：经 browser 统一并发队列执行
    */
   async screenshot(name, data = {}) {
-    return new Promise((resolve, reject) => {
-      const task = async () => {
-        try {
-          const res = await this.doScreenshot(name, data)
-          resolve(res)
-        } catch (err) {
-          reject(err)
-        } finally {
-          this.checkQueue()
-        }
-      }
-
-      if (this.activeTaskCount < this.maxConcurrency) {
-        task()
-      } else {
-        logger.mark(`[Playwright] 正在排队... 当前任务: ${this.activeTaskCount}, 队列: ${this.queue.length + 1}`)
-        this.queue.push(task)
-      }
-    })
-  }
-
-  checkQueue() {
-    if (this.queue.length > 0 && this.activeTaskCount < this.maxConcurrency) {
-      const nextTask = this.queue.shift()
-      nextTask()
-    }
+    return browser.runTask(() => this.doScreenshot(name, data))
   }
 
   /**
@@ -63,8 +29,9 @@ export default class Playwright extends Renderer {
    * @param {object} data 模板数据
    */
   async doScreenshot(name, data = {}) {
-    this.activeTaskCount++
-    browser.startTask()
+    const pcfg = cfg.renderer?.playwright || {}
+    const scale = pcfg.scale ?? 1.5
+    const style = pcfg.injectGlobalStyle ?? true
     let context = null
     let page = null
     const start = Date.now()
@@ -76,7 +43,7 @@ export default class Playwright extends Renderer {
 
       // 创建浏览器上下文
       context = await chromium.newContext({
-        deviceScaleFactor: data.deviceScaleFactor || data.viewport?.deviceScaleFactor || this.scale,
+        deviceScaleFactor: scale,
         viewport: { width: data.width || 800, height: 600 }, // 初始视口
       })
 
@@ -90,7 +57,7 @@ export default class Playwright extends Renderer {
       const fileUrl = pathToFileURL(path.join(_path, savePath)).href
       await page.goto(fileUrl, { waitUntil: "domcontentloaded" })
       // 注入全局样式
-      if (this.style) {
+      if (style) {
         await page.addStyleTag({ content: globalStyle })
       }
       // 定位元素
@@ -147,58 +114,34 @@ export default class Playwright extends Renderer {
         buff = []
         const pageHeight = data.pageHeight || 5000
         const totalHeight = box.height
-        const scale = data.deviceScaleFactor || data.viewport?.deviceScaleFactor || this.scale
-        const MAX_FULL_HEIGHT = 16000
+        const num = Math.ceil(totalHeight / pageHeight)
 
-        if (box.y + totalHeight <= MAX_FULL_HEIGHT) {
-          await page.setViewportSize({
-            width: Math.ceil(box.width),
-            height: Math.ceil(box.y + totalHeight),
-          })
-          const full = await page.screenshot({
+        await page.setViewportSize({
+          width: Math.ceil(box.width),
+          height: pageHeight + 100,
+        })
+
+        for (let i = 0; i < num; i++) {
+          const y = i * pageHeight
+          // 滚到目标条带顶端触发懒加载
+          await page.evaluate(scrollTop => window.scrollTo(0, scrollTop), box.y + y)
+          // 等待渲染稳定
+          await page.waitForTimeout(i === 0 ? 100 : 300)
+
+          const scrolled = await page.evaluate(() => window.scrollY)
+          const clipY = Math.max(0, box.y + y - scrolled)
+          const currentSliceHeight = Math.min(pageHeight, totalHeight - y)
+
+          const slice = await page.screenshot({
             ...screenshotOpts,
-            type: "png",
-            quality: undefined,
-            clip: { x: box.x, y: box.y, width: box.width, height: totalHeight },
+            clip: {
+              x: box.x,
+              y: clipY,
+              width: box.width,
+              height: currentSliceHeight,
+            },
           })
-          const image = sharp(full)
-          const { width, height } = await image.metadata()
-          const slicePx = Math.round(pageHeight * scale)
-          const num = Math.ceil(height / slicePx)
-          for (let i = 0; i < num; i++) {
-            const top = Math.min(i * slicePx, height - 1)
-            const sliceHeight = Math.min(slicePx, height - top)
-            const slice = image.clone().extract({ left: 0, top, width, height: sliceHeight })
-            buff.push(isPng ? await slice.png().toBuffer() : await slice.jpeg({ quality: data.quality || 90 }).toBuffer())
-          }
-        } else {
-          const num = Math.ceil(totalHeight / pageHeight)
-
-          await page.setViewportSize({
-            width: Math.ceil(box.width),
-            height: pageHeight + 100,
-          })
-
-          for (let i = 0; i < num; i++) {
-            const y = i * pageHeight
-            // 滚动页面触发懒加载
-            await page.evaluate(scrollTop => window.scrollTo(0, scrollTop), y)
-            // 等待渲染稳定
-            await page.waitForTimeout(i === 0 ? 100 : 300)
-
-            const currentSliceHeight = Math.min(pageHeight, totalHeight - y)
-
-            const slice = await page.screenshot({
-              ...screenshotOpts,
-              clip: {
-                x: box.x,
-                y: box.y,
-                width: box.width,
-                height: currentSliceHeight,
-              },
-            })
-            buff.push(slice)
-          }
+          buff.push(slice)
         }
       } else {
         // 单图
@@ -208,7 +151,7 @@ export default class Playwright extends Renderer {
       // 统计日志
       const sizeStr = Array.isArray(buff) ? `${(buff.reduce((a, b) => a + b.length, 0) / 1024).toFixed(2)}KB (${buff.length}页)` : `${(buff.length / 1024).toFixed(2)}KB`
 
-      logger.mark(`[图片生成][${browser.taskNum + 1}次][${name}] ${sizeStr} ${Date.now() - start}ms`)
+      logger.mark(`[图片生成][${browser.taskNum + 1}次][${name}] ${sizeStr} ${logger.green(`${Date.now() - start}ms`)}`)
 
       return buff
     } catch (error) {
@@ -217,8 +160,6 @@ export default class Playwright extends Renderer {
     } finally {
       // 资源清理
       if (context) await context.close().catch(() => {})
-      this.activeTaskCount--
-      browser.endTask()
     }
   }
 }

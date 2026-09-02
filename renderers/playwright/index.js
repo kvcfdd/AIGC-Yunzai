@@ -1,9 +1,9 @@
 import Playwright from "./lib/playwright.js"
 
 /**
- * @param config 本地config.yaml的配置内容
+ * 渲染参数 config/config/renderer.yaml
  * @returns renderer 渲染器对象
  */
-export default function (config) {
-  return new Playwright(config)
+export default function () {
+  return new Playwright()
 }
