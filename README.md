@@ -25,14 +25,14 @@
 
 接入 Gemini 大模型，让 bot 能聊天、能看能听、能干活
 
-| 类型 |   接收    |   发送    |
-| ---- | :-------: | :-------: |
-| 文本 |     ✅     |     ✅     |
-| 图片 |     ✅     |     ✅     |
-| 视频 |     ✅     |     ✅     |
-| 文件 |     ✅     |     ✅     |
-| 语音 |     ✅     |     ✅     |
-| 卡片 |     ✅     | ⚠️(仅音乐) |
+| 类型 | 接收  |   发送    |
+| ---- | :---: | :-------: |
+| 文本 |   ✅   |     ✅     |
+| 图片 |   ✅   |     ✅     |
+| 视频 |   ✅   |     ✅     |
+| 文件 |   ✅   |     ✅     |
+| 语音 |   ✅   |     ✅     |
+| 卡片 |   ✅   | ⚠️(仅音乐) |
 
 **AI 能做什么**
 
@@ -79,6 +79,63 @@ tools: run_cmd
 - 插件 skills 仅给ai提供指令参考，不能内置除 SKILL.md 外的其它文件
 
 推荐使用[锅巴插件](https://github.com/kvcfdd/guoba-plugin)进行配置
+
+</details>
+
+## 公共实例
+
+<details><summary>实例调用</summary>
+
+Chromium 以单例存在于 `lib/renderer/browser.js`
+
+**方式一：队列任务**
+
+经 `browser.runTask()` 进入统一并发队列：超出 `browser.concurrency` 的任务自动排队，任务结束后自动计入重启阈值与空闲回收逻辑
+
+```js
+import browser from "../../../lib/renderer/browser.js" // 相对路径按自身位置调整
+
+return browser.runTask(async () => {
+  let context = null
+  try {
+    const chromium = await browser.getBrowser()
+    context = await chromium.newContext({ viewport: { width: 1080, height: 720 } })
+    const page = await context.newPage()
+    // ...页面操作与截图...
+  } finally {
+    if (context) await context.close().catch(() => {})
+  }
+})
+```
+
+**方式二：直连实例**
+
+```js
+import browser from "../../../lib/renderer/browser.js"
+
+browser.startTask() // 必须与 endTask 成对出现
+let context = null
+try {
+  const chromium = await browser.getBrowser()
+  // ...渲染逻辑...
+} finally {
+  if (context) await context.close().catch(() => {})
+  browser.endTask()
+}
+```
+
+**直连与队列的区别**
+
+|               | 队列任务 `runTask`                          | 直连实例                          |
+| ------------- | ------------------------------------------- | --------------------------------- |
+| 并发限制      | 受 `browser.concurrency` 槽位限制，超出排队 | 不受限，可叠加在队列任务之上      |
+| 重启/回收计数 | 任务结束自动计入                            | 需手动 `startTask`/`endTask` 计入 |
+
+**注意事项**
+
+- 实例只会在活跃计数为 0 时才会被重启或空闲回收关停。直连时必须成对调用 `startTask`/`endTask`，才能保证使用期间实例不被关停；若只取实例不计数，实例可能在使用中途被重启/回收
+- 直连方式不受并发槽限制，高峰期会与队列任务叠加多个 Chromium 上下文，内存占用自行评估
+- 任务结束关闭自己的 context，避免上下文堆积
 
 </details>
 
