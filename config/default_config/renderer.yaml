@@ -1,7 +1,7 @@
 # 统一管控浏览器实例与渲染器参数
 browser:
   # 并发数
-  concurrency: 4
+  concurrency: 5
   # 调用次数重启阈值
   restartNum: 100
   # 空闲回收，超过该时长无新任务时关闭浏览器释放内存
@@ -12,9 +12,10 @@ browser:
 # playwright 渲染器
 playwright:
   # 缩放比例：越大质量越高，处理越慢、文件越大
-  scale: 1.5
+  # 默认1.0，若要高清可尝试 1.5 或 2.0
+  scale: 1.0
   # 注入全局样式(相当于套个滤镜)
-  injectGlobalStyle: true
+  injectGlobalStyle: false
 
 # HTTP 渲染服务
 # http://127.0.0.1:1134/render
@@ -26,4 +27,4 @@ server:
   # 监听端口
   port: 1134
   # 注入全局样式
-  injectGlobalStyle: true
+  injectGlobalStyle: false

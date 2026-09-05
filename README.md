@@ -43,7 +43,7 @@
 - 干点小事：群管理、点赞互动、定时提醒、后台任务(理论上能通过脚本/命令实现的几乎都可以)
 - 主动发言: 群内可主动参考上下文来参与群聊天
 - 自我防御: 能自己选择不回复或拉黑
-- 正则触发: 通过 skills 与内置工具搭配可让ai直接代替用户通过正则触发插件功能，且结果对ai可见，插件方0修改即可做到插件即工具，仅需自行编写一个 SKILL.md 放到对应插件目录下，含name: 插件名，description: 插件功能描述(100字以内)，tools: run_cmd 即可 (尽可能只写立即返回图片/文本类的功能)，agent 的 skills 放到 `config\skills\xxx\SKILL.md`，该 skills 是后台跑任务用的，自行参考主流实现(仅支持name，description，tools这三个字段)
+- 正则触发: 通过 skills 与内置工具搭配可让ai直接代替用户通过正则触发插件功能，且结果对ai可见，插件方0修改即可做到插件即工具，仅需自行编写一个 SKILL.md 放到对应插件目录下，含name: 插件名，description: 插件功能描述(100字以内)，tools: run_cmd 即可 (尽可能只写立即返回图片/文本类的功能)，agent 的 skills 放到 `data\skills\xxx\SKILL.md`，该 skills 是后台跑任务用的，自行参考主流实现(仅支持name，description，tools这三个字段)
 
 
 **插件 SKILL.md 示例**
@@ -88,9 +88,6 @@ tools: run_cmd
 
 Chromium 以单例存在于 `lib/renderer/browser.js`
 
-**方式一：队列任务**
-
-经 `browser.runTask()` 进入统一并发队列：超出 `browser.concurrency` 的任务自动排队，任务结束后自动计入重启阈值与空闲回收逻辑
 
 ```js
 import browser from "../../../lib/renderer/browser.js" // 相对路径按自身位置调整
@@ -108,34 +105,11 @@ return browser.runTask(async () => {
 })
 ```
 
-**方式二：直连实例**
-
-```js
-import browser from "../../../lib/renderer/browser.js"
-
-browser.startTask() // 必须与 endTask 成对出现
-let context = null
-try {
-  const chromium = await browser.getBrowser()
-  // ...渲染逻辑...
-} finally {
-  if (context) await context.close().catch(() => {})
-  browser.endTask()
-}
-```
-
-**直连与队列的区别**
-
-|               | 队列任务 `runTask`                          | 直连实例                          |
-| ------------- | ------------------------------------------- | --------------------------------- |
-| 并发限制      | 受 `browser.concurrency` 槽位限制，超出排队 | 不受限，可叠加在队列任务之上      |
-| 重启/回收计数 | 任务结束自动计入                            | 需手动 `startTask`/`endTask` 计入 |
 
 **注意事项**
 
-- 实例只会在活跃计数为 0 时才会被重启或空闲回收关停。直连时必须成对调用 `startTask`/`endTask`，才能保证使用期间实例不被关停；若只取实例不计数，实例可能在使用中途被重启/回收
-- 直连方式不受并发槽限制，高峰期会与队列任务叠加多个 Chromium 上下文，内存占用自行评估
-- 任务结束关闭自己的 context，避免上下文堆积
+- 任务结束记得关闭自己的 context，避免上下文堆积
+- 所有调用必须经 `browser.runTask()` 进入统一并发队列：超出 `browser.concurrency` 的任务自动排队，任务结束后自动计入重启阈值与空闲回收逻辑
 
 </details>
 
