@@ -42,7 +42,7 @@
     "sequelize": "^6.37.8",
     "sharp": "^0.34.5",
     "silk-wasm": "^3.7.1",
-    "sqlite3": "npm:@karinjs/sqlite3@^0.4.3",
+    "sqlite3": "npm:@karinjs/sqlite3@^6.0.2",
     "strip-ansi": "^7.2.0",
     "turndown": "^7.2.4",
     "ulid": "^3.0.2",
