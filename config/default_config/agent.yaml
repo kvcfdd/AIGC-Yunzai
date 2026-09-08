@@ -8,7 +8,7 @@ qq_whitelist:
 # Agent 模型
 model: gemini-3.7-flash
 # Agent 输出最大 token 数
-max_tokens: 8192
+max_tokens: 65536
 # Agent 思考最大轮次
 max_rounds: 20
 # Agent 系统提示词
@@ -29,7 +29,11 @@ workspace_max_file_mb: 50
 workspace_max_total_mb: 500
 # Agent MCP 工具服务器
 mcp:
-  servers: []
+  servers:
+    - name: anysearch
+      transport: http
+      url: https://api.anysearch.com/mcp
+      timeout_ms: 10000
   # Streamable HTTP:
   #   - name: agent-tools
   #     transport: http

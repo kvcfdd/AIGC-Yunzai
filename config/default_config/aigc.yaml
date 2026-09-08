@@ -3,19 +3,19 @@ enable: false
 
 # Google Gemini
 gemini:
-  # 可替换为兼容 Google Gemini API 的反代地址
-  endpoint: https://generativelanguage.googleapis.com
+  # 可替换为兼容 Google Gemini API https://generativelanguage.googleapis.com 的反代地址
+  endpoint: https://www.astrdark.cyou/ip/gemini
   # 多 Key 用英文逗号分隔，如 "xxx,yyy"
   api_key: 
   # 模型
-  model: gemini-3.6-flash
+  model: gemini-3.8-flash
   # 有状态模式：服务端管理上下文
   stateful: false
   # 思考等级 minimal, low, medium, high
   thinking_level: medium
 
 # 输出最大长度
-max_tokens: 8192
+max_tokens: 65536
 # 工具调用轮次上限 (2-10)
 max_tool_rounds: 5
 # 请求失败重试次数 (0-10, 0不重试)
@@ -35,7 +35,11 @@ system_prompt: |
 
 # MCP 工具服务器 (支持 Streamable HTTP 和 stdio)
 mcp:
-  servers: []
+  servers:
+    - name: anysearch
+      transport: http
+      url: https://api.anysearch.com/mcp
+      timeout_ms: 10000
   # Streamable HTTP 传输:
   #   - name: my-http-tools
   #     transport: http
@@ -101,7 +105,7 @@ ambient:
   # 最大冷却，单位分钟
   cooldown_max: 60
   # 水群模型(记忆总结/搜索工具也用)
-  model: gemini-3-flash-preview
+  model: gemini-3-6-flash
 
 # 语音合成 (悟声 Wusound TTS)
 voice:
