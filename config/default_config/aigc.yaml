@@ -85,6 +85,18 @@ group_history_count: 30
 # 可能存在问题，非必要勿开
 show_thinking: false
 
+# 思维链重建，需 show_thinking: true 时有效
+# 由于模型不会返回原始思维链内容，返回的思维链摘要内容过简且人机化严重，缺少人类思维的内心活动与措辞
+# 启用后将主模型返回的思维链摘要进行人味儿化还原，恢复为更自然的内心活动与措辞
+# 开启后延迟将增加一倍，需要额外的模型调用，且在此期间可被打断，自行注意管控
+thinking_reconstruct:
+  # 总开关
+  enable: false
+  # 模型
+  model: gemini-3.6-flash
+  # 超时
+  timeout_ms: 180000
+
 # B站 Cookie（用于视频搜索和下载，不填则使用匿名会话）
 bilibili_cookie: 
 
@@ -105,7 +117,7 @@ ambient:
   # 最大冷却，单位分钟
   cooldown_max: 60
   # 水群模型(记忆总结/搜索工具也用)
-  model: gemini-3-6-flash
+  model: gemini-3-5-flash
 
 # 语音合成 (悟声 Wusound TTS)
 voice:
