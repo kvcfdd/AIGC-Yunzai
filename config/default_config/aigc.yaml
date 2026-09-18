@@ -9,8 +9,6 @@ gemini:
   api_key: 
   # 模型
   model: gemini-3.8-flash
-  # 有状态模式：服务端管理上下文
-  stateful: false
   # 思考等级 minimal, low, medium, high
   thinking_level: medium
 
