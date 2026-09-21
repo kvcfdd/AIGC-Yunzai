@@ -173,7 +173,8 @@ export class maintTask extends plugin {
         if (g.proxies) g.proxies = g.proxies.filter(name => !regex.test(name))
       })
     config.mode = "rule"
-    config.rules = ["MATCH,♻️自动选择"]
+    const rules = Array.isArray(mihomo.rules) ? mihomo.rules.filter(r => typeof r === "string" && r.trim()) : []
+    if (rules.length) config.rules = rules
     try {
       await fs.writeFile(mihomo.config_path, YAML.stringify(config))
     } catch (err) {

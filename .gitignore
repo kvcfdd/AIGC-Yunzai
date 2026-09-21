@@ -1,6 +1,8 @@
 /config/*
 !/config/default_config
 /knowledge.md
+/CLAUDE.md
+/AGENTS.md
 /logs
 /node_modules
 /plugins/*
