@@ -16,7 +16,7 @@
 ## 改动
 
 - 适配器: 只保留 `OneBotv11,  GSUIDClient, stdin` 适配器，`GSUIDClient` 直连 `早柚核心`，`OneBotv11` 适配更多接口(移除频道接口)
-- 渲染器: 更换为 `playwright`，同时解耦 chromium 与 渲染，chromium 作为公共实例存在，可被插件使用，以减少资源浪费 (需注意: 使用[ZZZ-Plugin](https://github.com/ZZZure/ZZZ-Plugin)插件时需要将渲染精度调整至50，不然协议端会爆炸的...)
+- 渲染器: 更换为 `playwright`，同时解耦 chromium 与 渲染，chromium 作为公共实例存在，可被插件使用，以减少资源浪费
 - 移除: 复读.js, install.js, add.js
 
 ## AI
@@ -40,7 +40,7 @@
 - 多模态交互：发图片/视频/文件/语音，它不仅能看还能发
 - 联网能力：搜索、浏览网页
 - 画图渲染：把 Markdown/HTML 渲染成精美长图
-- 干点小事：群管理、点赞互动、定时提醒、后台任务(理论上能通过脚本/命令实现的应该都可以)
+- 干点小事：群管理、点赞互动、定时提醒、后台任务(嗯...)
 - 主动发言: 群内可主动参考上下文来参与群聊天
 - 自我防御: 能自己选择不回复或拉黑
 - 正则触发: 通过 skills 与内置工具搭配可让ai直接代替用户通过正则触发插件功能，且结果对ai可见，插件方0修改即可做到插件即工具，仅需自行编写一个 SKILL.md 放到对应插件目录下，含name: 插件名，description: 插件功能描述(100字以内)，tools: run_cmd 即可 (尽可能只写立即返回图片/文本类的功能)，agent 的 skills 放到 `data\skills\xxx\SKILL.md`，该 skills 是后台跑任务用的，自行参考主流实现(仅支持name，description，tools这三个字段)
