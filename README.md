@@ -5,7 +5,7 @@
 项目仅供学习交流使用，严禁用于任何商业用途和非法行为
 
 
-> 本项目可能失去对部分插件的兼容，建议使用[源库](https://github.com/TimeRainStarSky/Yunzai)
+> 本项目可能失去对部分插件的兼容，建议使用[源库](https://github.com/TimeRainStarSky/Yunzai)  
 > 自3.3.0版本后不再依赖Redis
 
 ---
