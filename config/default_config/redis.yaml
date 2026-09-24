@@ -1,12 +1,7 @@
-# Redis 命令路径
-path: redis-server
-# Redis 地址
-host: 127.0.0.1
-# Redis 端口
-port: 6379
-# Redis 用户名
-username:
-# Redis 密码
-password:
-# Redis 数据库
-db: 0
+# SQLite存储配置
+
+# 数据库位置(等效于原Redis)
+storage: data/db/redis.db
+
+# 过期键的后台清扫间隔，读时也会惰性判定过期，这里只是兜底清理
+sweep_interval_ms: 60000

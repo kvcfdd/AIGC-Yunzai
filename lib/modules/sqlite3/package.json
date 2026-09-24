@@ -1,0 +1,6 @@
+{
+  "name": "sqlite3",
+  "version": "1.0.0",
+  "description": "sqlite3 API 垫片，底层由 better-sqlite3 实现",
+  "main": "index.js"
+}

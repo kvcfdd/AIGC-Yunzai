@@ -4,6 +4,10 @@
 
 项目仅供学习交流使用，严禁用于任何商业用途和非法行为
 
+
+> 本项目可能失去对部分插件的兼容，建议使用[源库](https://github.com/TimeRainStarSky/Yunzai)
+> 自3.3.0版本后不再依赖Redis
+
 ---
 
 ## 新增
@@ -18,6 +22,7 @@
 - 适配器: 只保留 `OneBotv11,  GSUIDClient, stdin` 适配器，`GSUIDClient` 直连 `早柚核心`，`OneBotv11` 适配更多接口(移除频道接口)
 - 渲染器: 更换为 `playwright`，同时解耦 chromium 与 渲染，chromium 作为公共实例存在，可被插件使用，以减少资源浪费
 - 移除: 复读.js, install.js, add.js
+- 不再依赖Redis
 
 ## AI
 
@@ -118,7 +123,7 @@ return browser.runTask(async () => {
 ## 安装教程
 
 > 环境准备：Windows/Linux/MacOS/Android  
-> [Node.js(>=v24.16)](https://nodejs.org), [Valkey](https://valkey.io), [Git](https://git-scm.com), [FFmpeg](https://ffmpeg.org), [Python(建议)](https://www.python.org)
+> [Node.js(>=v24.16)](https://nodejs.org), [Git](https://git-scm.com), [FFmpeg](https://ffmpeg.org)
 
 1. Git Clone 项目
 
