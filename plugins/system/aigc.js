@@ -14,6 +14,7 @@ export class AigcFallback extends AigcChatCore {
       dsc: "AIGC 对话",
       event: "message",
       priority: 999999999,
+      task: { name: "AIGC上下文清理", cron: "0 17 4 * * *", fnc: () => this.pruneContext() },
       rule: [
         { reg: /^#关闭aigc$/i, fnc: "aigcOff" },
         { reg: /^#开启aigc$/i, fnc: "aigcOn" },
@@ -74,6 +75,12 @@ export class AigcFallback extends AigcChatCore {
     await con().clearAll()
     log.info("管理员清除了全部用户的对话记录")
     return this.reply("已清除全部用户的对话记录", true)
+  }
+
+  /** 定时清理超出保留期的上下文 */
+  async pruneContext() {
+    const removed = await con().pruneOld(cfg.aigc?.context_retention_days)
+    if (removed) log.info(`上下文清理: 已删除 ${removed} 条超期记录`)
   }
 
   // AIGC 对话主流程

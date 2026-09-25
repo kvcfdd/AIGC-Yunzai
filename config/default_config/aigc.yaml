@@ -87,6 +87,8 @@ context_rounds: 20
 context_tool_full_rounds: 7
 # 更早轮次工具结果的截断长度，0 表示不截断
 context_tool_max_chars: 200
+# 上下文保留天数，超期轮次由定时任务整轮清理；0 表示不限制
+context_retention_days: 0
 # 是否将思维链以合并转发方式单独发送
 # 可能存在问题，非必要勿开
 show_thinking: false
