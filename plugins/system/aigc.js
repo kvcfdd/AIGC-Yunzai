@@ -1,16 +1,12 @@
 import cfg from "../../lib/config/config.js"
-import common from "../../lib/common/common.js"
 import log from "../../lib/aigc/helpers/log.js"
-import { yesterdayStr } from "../../lib/aigc/conversation.js"
-import { summarizeOne, dailyMemoryJob } from "../../lib/aigc/helpers/memory.js"
-import { WEEKDAYS } from "../../lib/aigc/helpers/time.js"
 import { AigcChatCore, activeRequests, reqKey, registerInjectedChat } from "../../lib/aigc/chat/index.js"
 
 const con = () => Bot.aigc.conversation
 
 const AMBIENT_KEY_PREFIX = "aigc:ambient:cooldown"
 
-/** AIGC 入口：被 @ 且无命令匹配时触发，支持工具调用、长期记忆、知识库检索 */
+/** AIGC 入口：被 @ 且无命令匹配时触发，支持工具调用、历史检索与长期上下文 */
 export class AigcFallback extends AigcChatCore {
   constructor() {
     super({
@@ -18,16 +14,11 @@ export class AigcFallback extends AigcChatCore {
       dsc: "AIGC 对话",
       event: "message",
       priority: 999999999,
-      task: { name: "AIGC每日记忆总结", cron: "0 0 * * *", fnc: dailyMemoryJob, log: false },
       rule: [
         { reg: /^#关闭aigc$/i, fnc: "aigcOff" },
         { reg: /^#开启aigc$/i, fnc: "aigcOn" },
         { reg: /^#结束对话$/i, fnc: "clearConv" },
         { reg: /^#结束全部对话$/i, fnc: "clearAllConv", permission: "master" },
-        { reg: /^#总结记忆$/i, fnc: "manualMemory", permission: "master" },
-        { reg: /^#我的记忆$/i, fnc: "myMemory" },
-        { reg: /^#清除记忆$/i, fnc: "clearMemory" },
-        { reg: /^#清除全部记忆$/i, fnc: "clearAllMemory", permission: "master" },
         { reg: /^[\s\S]+$/, fnc: "aigcChat", log: false },
       ],
     })
@@ -64,8 +55,7 @@ export class AigcFallback extends AigcChatCore {
       log.info(`用户 ${this.e.user_id} 结束对话，已中止进行中的请求`)
     }
 
-    const msgs = await con().getMessages(this.e.self_id, this.e.user_id)
-    if (!msgs.length) return this.reply("暂无对话记录", true)
+    if (!(await con().hasHistory(this.e.self_id, this.e.user_id))) return this.reply("暂无对话记录", true)
 
     await con().clearSession(this.e.self_id, this.e.user_id)
     log.info(`用户 ${this.e.user_id} 清除了对话记录`)
@@ -84,58 +74,6 @@ export class AigcFallback extends AigcChatCore {
     await con().clearAll()
     log.info("管理员清除了全部用户的对话记录")
     return this.reply("已清除全部用户的对话记录", true)
-  }
-
-  /** 清除当前用户的记忆 */
-  async clearMemory() {
-    const entries = await con().getMemoryEntries(this.e.self_id, this.e.user_id)
-    if (!entries?.length) return this.reply("暂无记忆记录", true)
-
-    await con().clearMemory(this.e.self_id, this.e.user_id)
-    log.info(`用户 ${this.e.user_id} 清除了记忆`)
-    return this.reply(`已清除 ${entries.length} 条记忆`, true)
-  }
-
-  /** 清除全部用户的记忆 */
-  async clearAllMemory() {
-    if (!this.e.isMaster) return false
-
-    await con().clearAllMemories()
-    log.info("管理员清除了全部用户的记忆")
-    return this.reply("已清除全部用户的记忆", true)
-  }
-
-  /** 手动触发昨天的记忆总结，便于测试或补漏 */
-  async manualMemory() {
-    if (!this.e.isMaster) return false
-    const yesterday = yesterdayStr()
-
-    if (await con().hasMemoryForDate(this.e.self_id, this.e.user_id, yesterday)) {
-      return this.reply("昨天的对话已总结过，无需重复触发", true)
-    }
-
-    await con().addActiveUser(yesterday, this.e.self_id, this.e.user_id)
-    const result = await summarizeOne(this.e.self_id, this.e.user_id, yesterday)
-
-    if (result.ok) {
-      return this.reply("记忆总结完成", true)
-    }
-    return this.reply(`总结失败: ${result.reason}`, true)
-  }
-
-  /** 以合并转发形式查看缓存的记忆 */
-  async myMemory() {
-    const entries = await con().getMemoryEntries(this.e.self_id, this.e.user_id)
-    if (!entries?.length) return this.reply("暂无记忆记录", true)
-
-    const nodes = entries.map(e => {
-      const [y, m, d] = e.date.split("-").map(Number)
-      const w = WEEKDAYS[new Date(y, m - 1, d).getDay()]
-      return { type: "text", data: { text: `${e.date} ${w}\n${e.summary}` } }
-    })
-
-    const fwd = await common.makeForwardMsg(this.e, nodes, "📋 我的记忆")
-    return this.reply(fwd)
   }
 
   // AIGC 对话主流程

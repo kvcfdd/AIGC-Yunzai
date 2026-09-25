@@ -79,6 +79,14 @@ prefix_filter:
 
 # 群聊记录携带条数，0 则不携带
 group_history_count: 30
+
+# 上下文携带
+# 每次请求携带的历史轮数，0 则不携带
+context_rounds: 20
+# 工具结果完整保留的最近轮数，0 表示不再有完整保留的轮次
+context_tool_full_rounds: 7
+# 更早轮次工具结果的截断长度，0 表示不截断
+context_tool_max_chars: 200
 # 是否将思维链以合并转发方式单独发送
 # 可能存在问题，非必要勿开
 show_thinking: false
@@ -114,7 +122,7 @@ ambient:
   cooldown_min: 30
   # 最大冷却，单位分钟
   cooldown_max: 60
-  # 水群模型(记忆总结/搜索工具也用)
+  # 水群模型/搜索工具用
   model: gemini-3-5-flash
 
 # 语音合成 (悟声 Wusound TTS)
