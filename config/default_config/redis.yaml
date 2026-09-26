@@ -1,7 +1,0 @@
-# SQLite存储配置
-
-# 数据库位置(等效于原Redis)
-storage: data/db/redis.db
-
-# 过期键的后台清扫间隔，读时也会惰性判定过期，这里只是兜底清理
-sweep_interval_ms: 60000

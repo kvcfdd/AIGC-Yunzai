@@ -1,7 +1,6 @@
-# Sequelize 配置
-# https://sequelize.org/docs/v6/getting-started
+# 数据库配置
 
-# mysql, postgres, sqlite, db2, mariadb, mssql
+# sequelize 必需，固定 sqlite
 dialect: sqlite
 
 # SQLite 文件地址
