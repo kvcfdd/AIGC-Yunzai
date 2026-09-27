@@ -10,8 +10,10 @@ patchedDependencies:
 strictDepBuilds: false
 allowBuilds:
   better-sqlite3: false
+  esbuild: false
   log4js: true
   playwright: true
+  puppeteer: false
   sharp: true
 onlyBuiltDependencies:
   - log4js
