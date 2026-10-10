@@ -125,7 +125,7 @@ ambient:
   # 最大冷却，单位分钟
   cooldown_max: 60
   # 水群模型/搜索工具用
-  model: gemini-3-5-flash
+  model: gemini-3.6-flash
 
 # 语音合成 (悟声 Wusound TTS)
 voice:
