@@ -102,8 +102,6 @@ thinking_reconstruct:
   enable: false
   # 模型
   model: gemini-3.6-flash
-  # 超时
-  timeout_ms: 180000
 
 # B站 Cookie（用于视频搜索和下载，不填则使用匿名会话）
 bilibili_cookie: 
