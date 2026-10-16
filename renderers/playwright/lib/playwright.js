@@ -73,7 +73,7 @@ export default class Playwright extends Renderer {
       const target = (await locator.count()) > 0 ? locator : page.locator("body")
 
       // 等待字体就绪, 避免截图时字体未加载完
-      await page.evaluate(() => document.fonts.ready)
+      await Promise.race([page.evaluate(() => document.fonts.ready).catch(() => {}), new Promise(r => setTimeout(r, 5000))])
       await page.evaluate(async () => {
         await Promise.all(
           [...document.images].map(async img => {
