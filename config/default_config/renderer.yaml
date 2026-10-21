@@ -12,7 +12,7 @@ browser:
 # playwright 渲染器
 playwright:
   # 默认截图格式：webp / jpeg / png
-  format: webp
+  format: jpeg
   # 缩放比例：越大质量越高，处理越慢、文件越大
   # 默认1.0，若要高清可尝试 1.5 或 2.0
   scale: 1.0
@@ -31,7 +31,7 @@ server:
   # 监听端口
   port: 1134
   # 默认截图格式：webp / jpeg / png
-  format: webp
+  format: jpeg
   # 非 PNG 截图质量
   quality: 90
   # 注入全局样式
