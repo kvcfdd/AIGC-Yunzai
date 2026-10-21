@@ -4,6 +4,9 @@ import cfg from "../../../lib/config/config.js"
 import { globalStyle } from "../../style.js"
 import express from "express"
 
+/** WebP 单边最大像素 */
+const WEBP_MAX_DIMENSION = 16383
+
 export default class ServerRenderer extends Renderer {
   constructor() {
     super({
@@ -38,9 +41,6 @@ export default class ServerRenderer extends Renderer {
             const start = Date.now()
             const { html, url, selector, viewport, omitBackground, type, quality } = req.body
             if (!html && !url) throw new Error("Missing html or url")
-
-            // 确定图片格式
-            const imgType = type === "png" || type === "webp" ? "png" : "jpeg"
 
             // 获取浏览器实例
             const chromium = await browser.getBrowser()
@@ -100,10 +100,17 @@ export default class ServerRenderer extends Renderer {
               })
             }
 
+            // 默认格式取配置，WebP 单边超限降级 JPEG
+            const requestedType = type || cfg.renderer?.server?.format || "webp"
+            const isPng = requestedType === "png"
+            const isJpeg = requestedType === "jpeg" || requestedType === "jpg"
+            const overWebpLimit = Math.ceil(size?.width || 0) > WEBP_MAX_DIMENSION || Math.ceil(size?.height || 0) > WEBP_MAX_DIMENSION
+            const imgType = isPng ? "png" : isJpeg || overWebpLimit ? "jpeg" : "webp"
+
             // 构建截图选项
             const screenshotOptions = {
               type: imgType,
-              quality: imgType === "png" ? undefined : quality || 90,
+              quality: imgType === "png" ? undefined : quality || cfg.renderer?.server?.quality || 90,
               omitBackground: omitBackground || false,
               animations: "disabled",
             }

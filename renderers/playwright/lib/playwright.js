@@ -7,6 +7,9 @@ import { pathToFileURL } from "node:url"
 
 const _path = process.cwd()
 
+/** WebP 单边最大像素 */
+const WEBP_MAX_DIMENSION = 16383
+
 export default class Playwright extends Renderer {
   constructor() {
     super({
@@ -99,12 +102,18 @@ export default class Playwright extends Renderer {
 
       await page.setViewportSize({ width: viewWidth, height: viewHeight })
 
-      // 截图
+      // 截图：默认格式取配置，WebP 单边超限降级 JPEG
       let buff = null
-      const isPng = data.imgType === "png" || data.imgType === "webp"
+      const requestedType = data.imgType || pcfg.format || "webp"
+      const isPng = requestedType === "png"
+      const isJpeg = requestedType === "jpeg" || requestedType === "jpg"
+      const captureHeight = data.multiPage ? Math.min(data.pageHeight || 5000, Math.ceil(box.height)) : Math.ceil(box.height)
+      const overWebpLimit = Math.ceil(box.width * scale) > WEBP_MAX_DIMENSION || Math.ceil(captureHeight * scale) > WEBP_MAX_DIMENSION
+      const imgType = isPng ? "png" : isJpeg || overWebpLimit ? "jpeg" : "webp"
+      if (!isPng && !isJpeg && overWebpLimit) logger.warn(`[图片生成][${name}] 截图尺寸 ${Math.ceil(box.width)}x${captureHeight} 超出 WebP 单边上限 ${WEBP_MAX_DIMENSION}px，降级 JPEG`)
       const screenshotOpts = {
-        type: isPng ? "png" : "jpeg",
-        quality: isPng ? undefined : data.quality || 90,
+        type: imgType,
+        quality: imgType === "png" ? undefined : data.quality || pcfg.quality || 90,
         omitBackground: isPng ? !!data.omitBackground : false,
         animations: "disabled",
       }
