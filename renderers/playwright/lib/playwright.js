@@ -33,7 +33,7 @@ export default class Playwright extends Renderer {
    */
   async doScreenshot(name, data = {}) {
     const pcfg = cfg.renderer?.playwright || {}
-    const scale = pcfg.scale ?? 1.5
+    const scale = pcfg.scale ?? 1
     const style = pcfg.injectGlobalStyle ?? true
     let context = null
     let page = null
@@ -69,7 +69,7 @@ export default class Playwright extends Renderer {
 
       // 等待元素可见，如果找不到 #container 降级找 body
       try {
-        await locator.waitFor({ state: "visible", timeout: 2000 })
+        await locator.waitFor({ state: "visible", timeout: 3000 })
       } catch {
         // logger.warn(`[Playwright] 未找到 ${selector}，降级为 body`)
       }
@@ -110,7 +110,7 @@ export default class Playwright extends Renderer {
       const captureHeight = data.multiPage ? Math.min(data.pageHeight || 5000, Math.ceil(box.height)) : Math.ceil(box.height)
       const overWebpLimit = Math.ceil(box.width * scale) > WEBP_MAX_DIMENSION || Math.ceil(captureHeight * scale) > WEBP_MAX_DIMENSION
       const imgType = isPng ? "png" : isJpeg || overWebpLimit ? "jpeg" : "webp"
-      if (!isPng && !isJpeg && overWebpLimit) logger.warn(`[图片生成][${name}] 截图尺寸 ${Math.ceil(box.width)}x${captureHeight} 超出 WebP 单边上限 ${WEBP_MAX_DIMENSION}px，降级 JPEG`)
+      if (!isPng && !isJpeg && overWebpLimit) logger.warn(`[图片生成][${name}] 截图尺寸 ${Math.ceil(box.width * scale)}x${Math.ceil(captureHeight * scale)} 超出 WebP 单边上限 ${WEBP_MAX_DIMENSION}px，降级 JPEG`)
       const screenshotOpts = {
         type: imgType,
         quality: imgType === "png" ? undefined : data.quality || pcfg.quality || 90,
