@@ -1,23 +1,121 @@
 # AIGC 开关
 enable: false
 
-# Google Gemini
-gemini:
-  # 可替换为兼容 Google Gemini API https://generativelanguage.googleapis.com 的反代地址
-  endpoint: https://www.astrdark.cyou/ip/gemini
-  # 多 Key 用英文逗号分隔，如 "xxx,yyy"
-  api_key: 
-  # 模型
-  model: gemini-3.8-flash
-  # 思考等级 minimal, low, medium, high
-  thinking_level: medium
+# 模型配置列表 — 每个接口只列自己需要的字段
+# 可自行增加兼容对应接口的任意模型，如ds
+models:
+  - name: gemini
+    # API 基础地址；默认 https://generativelanguage.googleapis.com，可填反代
+    base_url: https://www.astrdark.cyou/ip/gemini
+    # 附加请求头；默认 {}
+    headers: {}
+    # Gemini API 版本；默认 v1beta
+    api_version: v1beta
+    # 单次请求超时（毫秒）
+    timeout_ms: 300000
+    # API Key，至少一个；列表或英文逗号分隔字符串
+    api_keys:
+    # 实际模型名
+    model: gemini-3.8-flash
+    # 思考等级 minimal/low/medium/high；默认 medium
+    thinking_level: medium
+    # 单次输出上限；默认 65536
+    max_output_tokens: 65536
+    # 失败重试次数 0-10；默认 0
+    retry_count: 0
+    # 多模态能力；false 时转文本占位
+    media:
+      image: true
+      audio: true
+      video: true
+      file: true
+    # 透传额外请求体；默认 {}
+    extra_body: {}
 
-# 输出最大长度
-max_tokens: 65536
+  # 其他模型配置示例，对应类型接口支持的所有配置项，为空则用默认值
+  # - name: openai
+  #   # OpenAI 兼容接口地址，填到 /v1 这一级
+  #   base_url: https://api.openai.com/v1
+  #   # 附加请求头；默认 {}
+  #   headers: {}
+  #   # 单次请求超时（毫秒）
+  #   timeout_ms: 300000
+  #   # API Key，至少一个
+  #   api_keys:
+  #   # 实际模型名；必填
+  #   model:
+  #   # 单次输出上限；默认 65536
+  #   max_output_tokens: 65536
+  #   # 输出上限字段 max_tokens | max_completion_tokens；默认 max_tokens
+  #   max_tokens_field: max_tokens
+  #   # 失败重试次数 0-10；默认 0
+  #   retry_count: 0
+  #   # 多模态能力；false 时转文本占位
+  #   media:
+  #     image: true
+  #     audio: true
+  #     video: false
+  #     file: true
+  #   # 透传额外请求体；如 { reasoning_effort: "medium", temperature: 1.0 }
+  #   extra_body: {}
+
+  # - name: anthropic
+  #   # Anthropic 接口地址
+  #   base_url: https://api.anthropic.com
+  #   # 附加请求头；默认 {}
+  #   headers: {}
+  #   # anthropic-version 请求头；默认 2023-06-01
+  #   api_version: "2023-06-01"
+  #   # 单次请求超时（毫秒）
+  #   timeout_ms: 300000
+  #   # API Key，至少一个
+  #   api_keys:
+  #   # 实际模型名；必填
+  #   model:
+  #   # 单次输出上限
+  #   max_output_tokens: 65536
+  #   # 失败重试次数 0-10；默认 0
+  #   retry_count: 0
+  #   # 多模态能力；false 时转文本占位
+  #   media:
+  #     image: true
+  #     audio: false
+  #     video: false
+  #     file: true
+  #   # 透传额外请求体；如 extended thinking 配置
+  #   extra_body: {}
+
+  # - name: responses
+  #   # OpenAI Responses 接口地址，填到 /v1 这一级
+  #   base_url: https://api.openai.com/v1
+  #   # 附加请求头；默认 {}
+  #   headers: {}
+  #   # 单次请求超时（毫秒）
+  #   timeout_ms: 300000
+  #   # API Key，至少一个
+  #   api_keys:
+  #   # 实际模型名；必填
+  #   model:
+  #   # 单次输出Token上限
+  #   max_output_tokens: 65536
+  #   # 失败重试次数 0-10；默认 0
+  #   retry_count: 0
+  #   # 多模态能力；false 时转文本占位
+  #   media:
+  #     image: true
+  #     audio: false
+  #     video: false
+  #     file: true
+  #   # 透传额外请求体；如 { reasoning: { effort: "medium" } }
+  #   extra_body: {}
+
+# 主对话使用的模型配置
+model_config: gemini
+# 主对话使用的内置 API 支持类型: gemini | openai | anthropic | responses
+api: gemini
+
 # 工具调用轮次上限 (2-10)
 max_tool_rounds: 5
-# 请求失败重试次数 (0-10, 0不重试)
-retry_count: 0
 # 机器人名称(AIGC相关日志显示)
 bot_name: AIGC
 # 系统提示词(预设与插话决策)
@@ -31,40 +129,45 @@ system_prompt: |
   如果你不确定答案，请坦诚说明，而不是编造信息。
   请尽量使用中文回答，除非用户明确要求使用其他语言。
 
-# MCP 工具服务器 (支持 Streamable HTTP 和 stdio)
+# MCP 工具服务器
 mcp:
-  servers:
-    - name: anysearch
-      transport: http
-      url: https://api.anysearch.com/mcp
-      timeout_ms: 10000
-  # Streamable HTTP 传输:
-  #   - name: my-http-tools
-  #     transport: http
-  #     url: http://localhost:3000/mcp
-  #     api_key: ""
+  servers: []
+  # Streamable HTTP:
+  #   - name: my-http-tools        # 服务器名
+  #     type: http                 # http=Streamable HTTP
+  #     url: http://localhost:3000/mcp  # 服务端 URL
+  #     headers: {}                # 额外请求头
+  #     # bearer_token: ""         # 等价于 headers.Authorization: Bearer <token>
+  #     timeout_ms: 30000          # 请求超时（毫秒）
+  #     protocol_mode: legacy      # legacy(默认，兼容 2025 协议) | auto(探测 2026-07-28)
+  #     # protocol_version: "2026-07-28"  # 可选，显式 pin 协议版本
+  # SSE (旧版远程传输):
+  #   - name: my-sse-tools
+  #     type: sse                  # sse=旧版 SSE 传输
+  #     url: http://localhost:3000/sse
+  #     headers: {}                # 额外请求头
+  #     # bearer_token: ""         # 等价于 Authorization: Bearer <token>
   #     timeout_ms: 30000
-  #     protocol_version: "2025-11-25"  # 可选，默认 2025-11-25
-  # stdio 传输:
+  # stdio:
   #   - name: my-local-tools
-  #     transport: stdio
-  #     command: npx
-  #     args: ["-y", "@modelcontextprotocol/server-filesystem", "/allowed/dir"]
-  #     env: {}
+  #     type: stdio                # stdio=本地子进程
+  #     command: npx               # 启动命令
+  #     args: ["-y", "@modelcontextprotocol/server-filesystem", "/allowed/dir"]  # 命令参数
+  #     env: {}                    # 额外环境变量
+  #     cwd: ""                    # 工作目录；默认项目根目录
   #     timeout_ms: 30000
-  #     protocol_version: "2025-11-25"  # 可选，默认 2025-11-25
 
 # 本地代理
 proxy:
-  # 代理地址，如 http://127.0.0.1:7890，为空则不启用
-  address: 
+  # 代理 URL，如 http://127.0.0.1:7890，为空则不启用
+  url:
   # LLM 请求是否走代理
   enable: false
 
 # 私聊开关
-private_enable: true
+private_chat_enable: true
 # 群里裸 @bot 是否触发LLM
-bare_at_reply: false
+reply_on_bare_at: false
 # 群白名单
 group_whitelist:
 #  - 123456789
@@ -89,41 +192,25 @@ context_tool_full_rounds: 7
 context_tool_max_chars: 200
 # 上下文保留天数，超期轮次由定时任务整轮清理；0 表示不限制
 context_retention_days: 0
-# 是否将思维链以合并转发方式单独发送
+# 是否将本轮过程以合并转发方式单独发送
 # 可能存在问题，非必要勿开
 show_thinking: false
-
-# 思维链重建，需 show_thinking: true 时有效
-# 由于模型不会返回原始思维链内容，返回的思维链摘要内容过简且人机化严重，缺少人类思维的内心活动与措辞
-# 启用后将主模型返回的思维链摘要进行人味儿化还原，恢复为更自然的内心活动与措辞
-# 开启后延迟将增加一倍，需要额外的模型调用，且在此期间可被打断，自行注意管控
-thinking_reconstruct:
-  # 总开关
-  enable: false
-  # 模型
-  model: gemini-3.6-flash
 
 # B站 Cookie（用于视频搜索和下载，不填则使用匿名会话）
 bilibili_cookie: 
 
-# 定时任务系统
-scheduled_task:
-  # 总开关：关闭时无法创建定时任务
-  enable: false
-  # 用户白名单: 仅主人 + 名单内用户可使用定时任务系统
-  qq_whitelist:
-  #  - 123456789
-
 # 水群模式：每个群随机冷却时间，冷却期间不会触发，触发也不一定回，LLM自己决定要不要回
-ambient:
+proactive_group_chat:
   # 是否启用
   enable: false
   # 最小冷却，单位分钟
   cooldown_min: 30
   # 最大冷却，单位分钟
   cooldown_max: 60
-  # 水群模型/搜索工具用
-  model: gemini-3.6-flash
+  # 使用的模型配置
+  model_config: gemini
+  # 使用的 API 类型
+  api: gemini
 
 # 语音合成 (悟声 Wusound TTS)
 voice:

@@ -19,3 +19,5 @@ onlyBuiltDependencies:
   - log4js
   - playwright
   - sharp
+minimumReleaseAgeExclude:
+  - openai@7.44.0

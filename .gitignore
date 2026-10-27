@@ -11,6 +11,7 @@
 !/plugins/other
 /renderers/*/config.yaml
 /resources
+/test
 /dump.rdb
 /pnpm-lock.yaml
 /*.sh
