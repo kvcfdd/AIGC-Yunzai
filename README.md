@@ -88,7 +88,6 @@ npx playwright install chromium
 | 启动 | node .        |
 | 停止 | node . stop   |
 | 守护 | node . daemon |
-| 测试 | pnpm test     |
 
 4. 使用 [pm2](https://pm2.keymetrics.io) 后台运行
 
