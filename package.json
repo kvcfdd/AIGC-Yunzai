@@ -45,6 +45,7 @@
     "sequelize": "^6.37.8",
     "sharp": "^0.34.5",
     "silk-wasm": "^3.7.1",
+    "sqlite-vec": "0.1.9",
     "sqlite3": "link:lib/modules/sqlite3",
     "strip-ansi": "^7.2.0",
     "turndown": "^7.2.4",

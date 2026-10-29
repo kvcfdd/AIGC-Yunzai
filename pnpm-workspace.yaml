@@ -9,10 +9,13 @@ patchedDependencies:
 
 strictDepBuilds: false
 allowBuilds:
+  '@google/genai': false
+  '@parcel/watcher': false
   better-sqlite3: false
   esbuild: false
   log4js: true
   playwright: true
+  protobufjs: false
   puppeteer: false
   sharp: true
 onlyBuiltDependencies:

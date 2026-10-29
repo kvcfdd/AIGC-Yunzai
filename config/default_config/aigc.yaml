@@ -18,7 +18,7 @@ models:
     # 实际模型名
     model: gemini-3.8-flash
     # 思考等级 minimal/low/medium/high；默认 medium
-    thinking_level: medium
+    thinking_level: high
     # 单次输出上限；默认 65536
     max_output_tokens: 65536
     # 失败重试次数 0-10；默认 0
@@ -112,7 +112,8 @@ models:
 # 主对话使用的模型配置
 model_config: gemini
 
-# 主对话使用的内置 API 支持类型: gemini | openai | anthropic | responses
+# 主对话使用的 API
+# 支持类型: gemini | openai | anthropic | responses
 api: gemini
 
 # 思考轮次上限 (2-50)，默认 30
@@ -126,6 +127,18 @@ search:
   max_results: 8
   # 搜索源 API Key：YAML 列表或英文逗号分隔，根据 provider 填写
   keys:
+
+# 记忆系统/向量语义检索
+embeddings:
+  # 向量语义检索开关
+  enable: false
+  # 向量模型使用的模型配置
+  model_config: gemini
+  # 向量模型使用的 API
+  # 支持类型: gemini | openai
+  api: gemini
+  # 向量模型
+  model: gemini-embedding-001
 
 # 机器人名称(AIGC相关日志显示)
 bot_name: AIGC
