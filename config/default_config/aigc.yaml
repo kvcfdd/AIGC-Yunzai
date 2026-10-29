@@ -13,7 +13,7 @@ models:
     api_version: v1beta
     # 单次请求超时（毫秒）
     timeout_ms: 300000
-    # API Key，至少一个；列表或英文逗号分隔字符串
+    # API Key，至少一个；列表或逗号/分号/空白分隔字符串
     api_keys:
     # 实际模型名
     model: gemini-3.8-flash
