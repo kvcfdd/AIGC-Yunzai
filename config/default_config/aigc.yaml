@@ -118,10 +118,8 @@ max_tool_rounds: 30
 
 # 网页搜索
 search:
-  # 搜索源: anysearch | tavily | bocha | brave | exa | firecrawl | baidu
+  # 搜索源: anysearch | deepseek | tavily | bocha | brave | exa | firecrawl | baidu
   provider: anysearch
-  # 单次返回条数上限 (1-20)
-  max_results: 8
   # 搜索源 API Key：YAML 列表或英文逗号分隔，根据 provider 填写
   keys:
 
@@ -222,14 +220,11 @@ prefix_filter:
 group_history_count: 30
 
 # 上下文携带
-# 每次请求携带的历史轮数，0 则不携带
-context_rounds: 20
+# 历史累计到该轮数后，下一次请求只携带最近 context_keep_rounds 轮；0 则不携带
+context_rounds: 30
 
-# 工具结果完整保留的最近轮数，0 表示不再有完整保留的轮次
-context_tool_full_rounds: 7
-
-# 更早轮次工具结果的截断长度，0 表示不截断
-context_tool_max_chars: 200
+# 精简后保留的最近轮数
+context_keep_rounds: 10
 
 # 上下文保留天数，超期轮次由定时任务整轮清理；0 表示不限制
 context_retention_days: 0
