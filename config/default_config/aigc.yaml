@@ -241,15 +241,111 @@ proactive_group_chat:
   # 使用的 API 类型
   api: gemini
 
-# 语音合成 (悟声 Wusound TTS)
+# 语音合成 (TTS)
+# 服务商: wusound | openai | gemini | minimax | elevenlabs | azure | volcengine | mimo | fishaudio | dashscope
 voice:
-  # 悟声 API Key，在 https://dev.wusound.cn 开发者中心获取
-  api_key: 
-  # 语音角色 UUID
-  voice_id: 
-  # 是否启用偏向文本的情感风格
-  break_clone: true
-  # 参数预设: creative(创意/最佳表现力) | balance(均衡) | stable(稳定)
-  preset: balance
-  # 语速 0.5-2.0，越大越慢
-  speech_rate: 1
+  provider: wusound
+  providers:
+    # 悟声 Wusound
+    wusound:
+      api_key:
+      voice_id:
+      break_clone: true
+      preset: balance
+      speech_rate: 1
+    # OpenAI 兼容 /audio/speech
+    openai:
+      api_key:
+      base_url: "https://api.openai.com/v1"
+      model: "tts-1"
+      voice: "alloy"
+      # wav | mp3 | opus | aac | flac | pcm
+      response_format: "wav"
+      speed: 1
+      timeout_ms: 20000
+      headers: {}
+    # Gemini TTS
+    gemini:
+      api_key:
+      base_url: "https://generativelanguage.googleapis.com"
+      model: "gemini-2.5-flash-preview-tts"
+      voice: "Leda"
+      prefix: ""
+      timeout_ms: 20000
+    # MiniMax T2A v2
+    minimax:
+      api_key:
+      base_url: "https://api.minimax.chat/v1/t2a_v2"
+      group_id: ""
+      model: "speech-02-turbo"
+      voice_id: "female-shaonv"
+      speed: 1.0
+      vol: 1.0
+      pitch: 0
+      emotion: "auto"
+      language_boost: "auto"
+      format: "wav"
+      sample_rate: 32000
+      bitrate: 128000
+      timeout_ms: 60000
+    # ElevenLabs
+    elevenlabs:
+      api_key:
+      base_url: "https://api.elevenlabs.io/v1"
+      voice_id: "JBFqnCBsd6RMkjVDRZzb"
+      model: "eleven_multilingual_v2"
+      output_format: "mp3_44100_128"
+      stability: ""
+      similarity_boost: ""
+      style: ""
+      use_speaker_boost: true
+      timeout_ms: 20000
+    # Azure 语音服务
+    azure:
+      subscription_key:
+      region: "eastus"
+      voice: "zh-CN-YunxiaNeural"
+      style: "cheerful"
+      role: "Boy"
+      rate: "1"
+      volume: "100"
+      lang: "zh-CN"
+      output_format: "riff-48khz-16bit-mono-pcm"
+      timeout_ms: 20000
+    # 火山引擎语音合成
+    volcengine:
+      api_key:
+      appid:
+      cluster: "volcano_tts"
+      voice_type:
+      speed_ratio: 1.0
+      base_url: "https://openspeech.bytedance.com/api/v1/tts"
+      timeout_ms: 20000
+    # MiMo TTS
+    mimo:
+      api_key:
+      base_url: "https://api.xiaomimimo.com/v1"
+      model: "mimo-v2.5-tts"
+      voice: "mimo_default"
+      format: "wav"
+      style_prompt: ""
+      dialect: ""
+      seed_text: "Hello, MiMo, have you had lunch?"
+      timeout_ms: 20000
+    # FishAudio
+    fishaudio:
+      api_key:
+      base_url: "https://api.fish.audio/v1"
+      model: "s2-pro"
+      reference_id: ""
+      character: "可莉"
+      format: "wav"
+      timeout_ms: 20000
+    # 阿里云百炼
+    dashscope:
+      api_key:
+      base_url: "https://dashscope.aliyuncs.com/api/v1"
+      model: "qwen-tts"
+      voice: "Cherry"
+      language_type: "auto"
+      timeout_ms: 20000
