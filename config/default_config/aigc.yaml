@@ -116,6 +116,13 @@ api: gemini
 # 思考轮次上限 (2-50)
 max_tool_rounds: 30
 
+# 子代理
+agent:
+  # 子代理使用的模型配置
+  model_config: gemini
+  # 使用的 API
+  api: gemini
+
 # 网页搜索
 search:
   # 搜索源: anysearch | deepseek | tavily | bocha | brave | exa | firecrawl | baidu
