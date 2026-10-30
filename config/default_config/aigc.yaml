@@ -2,26 +2,24 @@
 enable: false
 
 # 模型配置列表 — 每个接口只列自己需要的字段
-# 可自行增加兼容对应接口的任意模型，如ds
+# 以下是四个api示例配置，可自行新增兼容模型
 models:
   - name: gemini
-    # API 基础地址；默认 https://generativelanguage.googleapis.com，可填反代
+    # API 基础地址，可填反代
     base_url: https://www.astrdark.cyou/ip/gemini
-    # 附加请求头；默认 {}
+    # 附加请求头，如 { Authorization: "Bearer <token>" }
     headers: {}
-    # Gemini API 版本；默认 v1beta
-    api_version: v1beta
     # 单次请求超时（毫秒）
     timeout_ms: 300000
     # API Key，至少一个；列表或逗号/分号/空白分隔字符串
     api_keys:
     # 实际模型名
     model: gemini-3.8-flash
-    # 思考等级 minimal/low/medium/high；默认 medium
+    # 思考等级：minimal | low | medium | high
     thinking_level: high
-    # 单次输出上限；默认 65536
+    # 单次输出上限
     max_output_tokens: 65536
-    # 失败重试次数 0-10；默认 0
+    # 失败重试次数 0-10
     retry_count: 0
     # 多模态能力；false 时转文本占位
     media:
@@ -29,85 +27,84 @@ models:
       audio: true
       video: true
       file: true
-    # 透传额外请求体；默认 {}
+    # 透传额外请求体，如 { temperature: 0.7 }
     extra_body: {}
 
-  # 其他模型配置示例，对应类型接口支持的所有配置项，为空则用默认值
-  # - name: openai
-  #   # OpenAI 兼容接口地址，填到 /v1 这一级
-  #   base_url: https://api.openai.com/v1
-  #   # 附加请求头；默认 {}
-  #   headers: {}
-  #   # 单次请求超时（毫秒）
-  #   timeout_ms: 300000
-  #   # API Key，至少一个
-  #   api_keys:
-  #   # 实际模型名；必填
-  #   model:
-  #   # 单次输出上限；默认 65536
-  #   max_output_tokens: 65536
-  #   # 输出上限字段 max_tokens | max_completion_tokens；默认 max_tokens
-  #   max_tokens_field: max_tokens
-  #   # 失败重试次数 0-10；默认 0
-  #   retry_count: 0
-  #   # 多模态能力；false 时转文本占位
-  #   media:
-  #     image: true
-  #     audio: true
-  #     video: false
-  #     file: true
-  #   # 透传额外请求体；如 { reasoning_effort: "medium", temperature: 1.0 }
-  #   extra_body: {}
+  - name: openai
+    # OpenAI 兼容接口地址，填到 /v1 这一级
+    base_url: https://api.openai.com/v1
+    # 附加请求头
+    headers: {}
+    # 单次请求超时（毫秒）
+    timeout_ms: 300000
+    # API Key，至少一个
+    api_keys:
+    # 实际模型名；必填
+    model:
+    # 单次输出上限
+    max_output_tokens: 65536
+    # 输出上限字段：max_tokens | max_completion_tokens
+    max_tokens_field: max_tokens
+    # 失败重试次数 0-10
+    retry_count: 0
+    # 多模态能力；false 时转文本占位
+    media:
+      image: true
+      audio: true
+      video: false
+      file: true
+    # 透传额外请求体；如 { reasoning_effort: "medium", temperature: 1.0 }
+    extra_body: {}
 
-  # - name: anthropic
-  #   # Anthropic 接口地址
-  #   base_url: https://api.anthropic.com
-  #   # 附加请求头；默认 {}
-  #   headers: {}
-  #   # anthropic-version 请求头；默认 2023-06-01
-  #   api_version: "2023-06-01"
-  #   # 单次请求超时（毫秒）
-  #   timeout_ms: 300000
-  #   # API Key，至少一个
-  #   api_keys:
-  #   # 实际模型名；必填
-  #   model:
-  #   # 单次输出上限
-  #   max_output_tokens: 65536
-  #   # 失败重试次数 0-10；默认 0
-  #   retry_count: 0
-  #   # 多模态能力；false 时转文本占位
-  #   media:
-  #     image: true
-  #     audio: false
-  #     video: false
-  #     file: true
-  #   # 透传额外请求体；如 extended thinking 配置
-  #   extra_body: {}
+  - name: anthropic
+    # Anthropic 接口地址
+    base_url: https://api.anthropic.com
+    # 附加请求头
+    headers: {}
+    # anthropic-version 请求头
+    api_version: "2023-06-01"
+    # 单次请求超时（毫秒）
+    timeout_ms: 300000
+    # API Key，至少一个
+    api_keys:
+    # 实际模型名；必填
+    model:
+    # 单次输出上限
+    max_output_tokens: 65536
+    # 失败重试次数 0-10
+    retry_count: 0
+    # 多模态能力；false 时转文本占位
+    media:
+      image: true
+      audio: false
+      video: false
+      file: true
+    # 透传额外请求体；如 extended thinking 配置
+    extra_body: {}
 
-  # - name: responses
-  #   # OpenAI Responses 接口地址，填到 /v1 这一级
-  #   base_url: https://api.openai.com/v1
-  #   # 附加请求头；默认 {}
-  #   headers: {}
-  #   # 单次请求超时（毫秒）
-  #   timeout_ms: 300000
-  #   # API Key，至少一个
-  #   api_keys:
-  #   # 实际模型名；必填
-  #   model:
-  #   # 单次输出Token上限
-  #   max_output_tokens: 65536
-  #   # 失败重试次数 0-10；默认 0
-  #   retry_count: 0
-  #   # 多模态能力；false 时转文本占位
-  #   media:
-  #     image: true
-  #     audio: false
-  #     video: false
-  #     file: true
-  #   # 透传额外请求体；如 { reasoning: { effort: "medium" } }
-  #   extra_body: {}
+  - name: responses
+    # OpenAI Responses 接口地址，填到 /v1 这一级
+    base_url: https://api.openai.com/v1
+    # 附加请求头
+    headers: {}
+    # 单次请求超时（毫秒）
+    timeout_ms: 300000
+    # API Key，至少一个
+    api_keys:
+    # 实际模型名；必填
+    model:
+    # 单次输出Token上限
+    max_output_tokens: 65536
+    # 失败重试次数 0-10
+    retry_count: 0
+    # 多模态能力；false 时转文本占位
+    media:
+      image: true
+      audio: false
+      video: false
+      file: true
+    # 透传额外请求体；如 { reasoning: { effort: "medium" } }
+    extra_body: {}
 
 # 主对话使用的模型配置
 model_config: gemini
@@ -116,7 +113,7 @@ model_config: gemini
 # 支持类型: gemini | openai | anthropic | responses
 api: gemini
 
-# 思考轮次上限 (2-50)，默认 30
+# 思考轮次上限 (2-50)
 max_tool_rounds: 30
 
 # 网页搜索
@@ -132,13 +129,27 @@ search:
 embeddings:
   # 向量语义检索开关
   enable: false
-  # 向量模型使用的模型配置
+  # 连接配置来源：复用该模型配置的 base_url 与 api_keys
   model_config: gemini
   # 向量模型使用的 API
   # 支持类型: gemini | openai
   api: gemini
   # 向量模型
   model: gemini-embedding-001
+  # 输出维度
+  dimensions: 768
+  # 单条文本最大字符数，超出截断
+  max_input_chars: 2000
+  # 单次请求超时（毫秒）
+  timeout_ms: 30000
+  # 失败重试次数 0-10
+  retry_count: 3
+  # 附加请求头；如反代鉴权、伪装 UA
+  # headers: { Authorization: "Bearer <token>", User-Agent: "Mozilla/5.0" }
+  headers: {}
+  # 透传额外请求体
+  # extra_body: { title: "对话记录", encoding_format: "float" }
+  extra_body: {}
 
 # 机器人名称(AIGC相关日志显示)
 bot_name: AIGC
@@ -164,7 +175,7 @@ mcp:
   #     headers: {}                # 额外请求头
   #     # bearer_token: ""         # 等价于 headers.Authorization: Bearer <token>
   #     timeout_ms: 30000          # 请求超时（毫秒）
-  #     protocol_mode: legacy      # legacy(默认，兼容 2025 协议) | auto(探测 2026-07-28)
+  #     protocol_mode: legacy      # legacy(兼容 2025 协议) | auto(探测 2026-07-28)
   #     # protocol_version: "2026-07-28"  # 可选，显式 pin 协议版本
   # SSE (旧版远程传输):
   #   - name: my-sse-tools
@@ -179,7 +190,7 @@ mcp:
   #     command: npx               # 启动命令
   #     args: ["-y", "@modelcontextprotocol/server-filesystem", "/allowed/dir"]  # 命令参数
   #     env: {}                    # 额外环境变量
-  #     cwd: ""                    # 工作目录；默认项目根目录
+  #     cwd: ""                    # 工作目录，留空为项目根目录
   #     timeout_ms: 30000
 
 # 本地代理
@@ -239,9 +250,9 @@ proactive_group_chat:
 voice:
   # 悟声 API Key，在 https://dev.wusound.cn 开发者中心获取
   api_key: 
-  # 默认语音角色 UUID
+  # 语音角色 UUID
   voice_id: 
-  # 是否启用启用偏向文本的情感风格
+  # 是否启用偏向文本的情感风格
   break_clone: true
   # 参数预设: creative(创意/最佳表现力) | balance(均衡) | stable(稳定)
   preset: balance
