@@ -7,10 +7,6 @@ models:
   - name: gemini
     # API 基础地址，可填反代
     base_url: https://www.astrdark.cyou/ip/gemini
-    # 附加请求头，如 { Authorization: "Bearer <token>" }
-    headers: {}
-    # 单次请求超时（毫秒）
-    timeout_ms: 300000
     # API Key，至少一个；列表或逗号/分号/空白分隔字符串
     api_keys:
     # 实际模型名
@@ -21,14 +17,6 @@ models:
     max_output_tokens: 65536
     # 失败重试次数 0-10
     retry_count: 0
-    # 多模态能力；false 时转文本占位
-    media:
-      image: true
-      audio: true
-      video: true
-      file: true
-    # 透传额外请求体，如 { temperature: 0.7 }
-    extra_body: {}
 
   - name: openai
     # OpenAI 兼容接口地址，填到 /v1 这一级
