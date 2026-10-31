@@ -7,6 +7,8 @@ models:
   - name: gemini
     # API 基础地址，可填反代
     base_url: https://www.astrdark.cyou/ip/gemini
+    # 是否走代理
+    proxy: false
     # API Key，至少一个；列表或逗号/分号/空白分隔字符串
     api_keys:
     # 实际模型名
@@ -21,6 +23,8 @@ models:
   - name: openai
     # OpenAI 兼容接口地址，填到 /v1 这一级
     base_url: https://api.openai.com/v1
+    # 是否走代理
+    proxy: false
     # 附加请求头
     headers: {}
     # 单次请求超时（毫秒）
@@ -47,6 +51,8 @@ models:
   - name: anthropic
     # Anthropic 接口地址
     base_url: https://api.anthropic.com
+    # 是否走代理
+    proxy: false
     # 附加请求头
     headers: {}
     # anthropic-version 请求头
@@ -73,6 +79,8 @@ models:
   - name: responses
     # OpenAI Responses 接口地址，填到 /v1 这一级
     base_url: https://api.openai.com/v1
+    # 是否走代理
+    proxy: false
     # 附加请求头
     headers: {}
     # 单次请求超时（毫秒）
@@ -111,18 +119,27 @@ agent:
   # 使用的 API
   api: gemini
 
+# 多模态识别 — 主模型配置不支持某类媒体时，用该模型配置识别并转为文本
+multimodal:
+  # 多模态识别模型配置
+  model_config: gemini
+  # 识别模型使用的 API
+  api: gemini
+
 # 网页搜索
 search:
   # 搜索源: anysearch | deepseek | tavily | bocha | brave | exa | firecrawl | baidu
   provider: anysearch
   # 搜索源 API Key：YAML 列表或英文逗号分隔，根据 provider 填写
   keys:
+  # 是否走代理
+  proxy: false
 
 # 记忆系统/向量语义检索
 embeddings:
   # 向量语义检索开关
   enable: false
-  # 连接配置来源：复用该模型配置的 base_url 与 api_keys
+  # 连接配置来源：复用该模型配置的 base_url、api_keys 与 proxy 开关
   model_config: gemini
   # 向量模型使用的 API
   # 支持类型: gemini | openai
@@ -186,12 +203,8 @@ mcp:
   #     cwd: ""                    # 工作目录，留空为项目根目录
   #     timeout_ms: 30000
 
-# 本地代理
+# 本地代理地址，如 http://127.0.0.1:7890
 proxy:
-  # 代理 URL，如 http://127.0.0.1:7890，为空则不启用
-  url:
-  # LLM 请求是否走代理
-  enable: false
 
 # 私聊开关
 private_chat_enable: true
@@ -243,6 +256,7 @@ voice:
   providers:
     # 悟声 Wusound
     wusound:
+      proxy: false
       api_key:
       voice_id:
       break_clone: true
@@ -250,6 +264,7 @@ voice:
       speech_rate: 1
     # OpenAI 兼容 /audio/speech
     openai:
+      proxy: false
       api_key:
       base_url: "https://api.openai.com/v1"
       model: "tts-1"
@@ -261,6 +276,7 @@ voice:
       headers: {}
     # Gemini TTS
     gemini:
+      proxy: false
       api_key:
       base_url: "https://generativelanguage.googleapis.com"
       model: "gemini-2.5-flash-preview-tts"
@@ -269,6 +285,7 @@ voice:
       timeout_ms: 20000
     # MiniMax T2A v2
     minimax:
+      proxy: false
       api_key:
       base_url: "https://api.minimax.chat/v1/t2a_v2"
       group_id: ""
@@ -285,6 +302,7 @@ voice:
       timeout_ms: 60000
     # ElevenLabs
     elevenlabs:
+      proxy: false
       api_key:
       base_url: "https://api.elevenlabs.io/v1"
       voice_id: "JBFqnCBsd6RMkjVDRZzb"
@@ -297,6 +315,7 @@ voice:
       timeout_ms: 20000
     # Azure 语音服务
     azure:
+      proxy: false
       subscription_key:
       region: "eastus"
       voice: "zh-CN-YunxiaNeural"
@@ -309,6 +328,7 @@ voice:
       timeout_ms: 20000
     # 火山引擎语音合成
     volcengine:
+      proxy: false
       api_key:
       appid:
       cluster: "volcano_tts"
@@ -318,6 +338,7 @@ voice:
       timeout_ms: 20000
     # MiMo TTS
     mimo:
+      proxy: false
       api_key:
       base_url: "https://api.xiaomimimo.com/v1"
       model: "mimo-v2.5-tts"
@@ -329,6 +350,7 @@ voice:
       timeout_ms: 20000
     # FishAudio
     fishaudio:
+      proxy: false
       api_key:
       base_url: "https://api.fish.audio/v1"
       model: "s2-pro"
@@ -338,6 +360,7 @@ voice:
       timeout_ms: 20000
     # 阿里云百炼
     dashscope:
+      proxy: false
       api_key:
       base_url: "https://dashscope.aliyuncs.com/api/v1"
       model: "qwen-tts"
