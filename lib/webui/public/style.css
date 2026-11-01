@@ -1281,7 +1281,7 @@ code {
 }
 
 .help-preview-shell {
-  overflow-x: auto;
+  overflow: hidden;
   padding: 4px 0;
 }
 
