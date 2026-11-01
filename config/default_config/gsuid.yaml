@@ -19,9 +19,9 @@ reconnect_interval: 5
 forward_self_msg: false
 
 # 上报过滤：消息开头和结尾同时配置时，两者都符合才不上报；仅配置一项时只匹配该项
-no_report_start:
+no_report_start: []
 #  - 开头文本1
 #  - 开头文本2
-no_report_end:
+no_report_end: []
 #  - 结尾文本1
 #  - 结尾文本2

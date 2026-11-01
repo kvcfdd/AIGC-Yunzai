@@ -87,6 +87,18 @@
       <span id="toast-text" class="toast-text"></span>
     </div>
     <div id="dialog" class="dialog-wrap" hidden></div>
+    <div id="editor" class="editor-wrap" hidden>
+      <div class="editor-card" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+        <header class="editor-head">
+          <h2 id="editor-title">编辑文本</h2>
+          <button id="editor-close" class="icon-button" type="button" aria-label="关闭编辑器">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"></path></svg>
+          </button>
+        </header>
+        <textarea id="editor-area" class="editor-area" spellcheck="false"></textarea>
+        <footer class="editor-foot"><span id="editor-meta"></span><button id="editor-done" class="button primary" type="button">完成</button></footer>
+      </div>
+    </div>
     <script type="module" src="/yunzai/app.js"></script>
   </body>
 </html>
