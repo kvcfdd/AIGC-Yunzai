@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
     <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#f5f5f7" />
     <title>Yunzai 配置</title>
-    <link rel="stylesheet" href="/aigc_yunzai/style.css" />
+    <link rel="stylesheet" href="/yunzai/style.css" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23007aff'/%3E%3Crect x='16' y='20' width='32' height='4' rx='2' fill='white'/%3E%3Crect x='16' y='30' width='24' height='4' rx='2' fill='white' opacity='.85'/%3E%3Crect x='16' y='40' width='15' height='4' rx='2' fill='white' opacity='.7'/%3E%3C/svg%3E" />
   </head>
   <body>
     <div id="gate" class="gate" hidden>
+      <div class="gate-ambient" aria-hidden="true"><span></span><span></span><span></span></div>
       <div class="gate-card">
         <form id="gate-form" class="gate-form"></form>
       </div>
@@ -29,13 +31,17 @@
           </button>
         </div>
 
-        <label class="search">
+        <div class="search">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="10.8" cy="10.8" r="6.2"></circle>
             <path d="m15.5 15.5 4.2 4.2"></path>
           </svg>
-          <input id="config-search" type="search" placeholder="搜索配置" autocomplete="off" spellcheck="false" />
-        </label>
+          <input id="config-search" type="search" placeholder="搜索配置" autocomplete="off" spellcheck="false" aria-label="搜索配置" />
+          <button id="config-search-clear" class="search-clear" type="button" aria-label="清除搜索" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8 8 8M16 8l-8 8"></path></svg>
+          </button>
+          <kbd class="search-hint" aria-hidden="true" title="按 / 聚焦搜索">/</kbd>
+        </div>
 
         <nav id="config-groups" class="config-groups" aria-label="配置文件"></nav>
         <div id="sidebar-foot" class="sidebar-foot"></div>
@@ -51,24 +57,36 @@
               <h1 id="config-title">配置</h1>
               <span id="dirty" class="dirty" hidden>未保存</span>
             </div>
-            <p id="config-path" class="toolbar-path"></p>
+            <div class="path-row">
+              <p id="config-path" class="toolbar-path"></p>
+              <button id="copy-path" class="path-copy" type="button" aria-label="复制文件路径" title="复制文件路径" hidden>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="9" y="9" width="11" height="11" rx="2.5"></rect>
+                  <path d="M6.5 15H5a1.5 1.5 0 0 1-1.5-1.5V5A1.5 1.5 0 0 1 5 3.5h8.5A1.5 1.5 0 0 1 15 5v1.5"></path>
+                </svg>
+              </button>
+            </div>
+            <p id="config-description" class="toolbar-desc" hidden></p>
           </div>
           <div class="toolbar-actions">
             <button class="icon-button" data-theme-toggle type="button" aria-label="切换主题"></button>
-            <div class="segmented" role="tablist" aria-label="编辑模式">
-              <button type="button" data-mode="form" class="active">表单</button>
-              <button type="button" data-mode="yaml">YAML</button>
+            <div class="segmented" role="tablist" aria-label="编辑模式" data-mode="form">
+              <button type="button" data-mode="form" class="active" role="tab" aria-selected="true">表单</button>
+              <button type="button" data-mode="yaml" role="tab" aria-selected="false">YAML</button>
             </div>
             <button id="save" class="button primary" type="button" disabled>保存</button>
           </div>
         </header>
-        <div id="content" class="content enter"></div>
+        <div id="content" class="content"></div>
       </main>
     </div>
 
     <div id="sidebar-backdrop" class="sidebar-backdrop" hidden></div>
-    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+      <span id="toast-icon" class="toast-icon" aria-hidden="true"></span>
+      <span id="toast-text" class="toast-text"></span>
+    </div>
     <div id="dialog" class="dialog-wrap" hidden></div>
-    <script type="module" src="/aigc_yunzai/app.js"></script>
+    <script type="module" src="/yunzai/app.js"></script>
   </body>
 </html>
