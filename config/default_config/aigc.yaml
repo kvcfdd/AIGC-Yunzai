@@ -42,7 +42,7 @@ models:
     # 多模态能力；false 时转文本占位
     media:
       image: true
-      audio: true
+      audio: false
       video: false
       file: true
     # 透传额外请求体；如 { reasoning_effort: "medium", temperature: 1.0 }
