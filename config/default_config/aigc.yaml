@@ -1,8 +1,8 @@
 # AIGC 开关
 enable: false
 
-# 模型配置列表 — 每个接口只列自己需要的字段
-# 以下是四个api示例配置，可自行新增兼容模型
+# 模型配置列表 — 每个请求适配器只列自己需要的字段
+# 以下是四个请求适配器示例配置，可自行新增兼容模型
 models:
   - name: gemini
     # API 基础地址，可填反代
@@ -105,26 +105,35 @@ models:
 # 主对话使用的模型配置
 model_config: gemini
 
-# 主对话使用的 API
-# 支持类型: gemini | openai | anthropic | responses
-api: gemini
+# 主对话使用的请求适配器
+# 可选请求适配器: gemini | openai | anthropic | responses
+adapter: gemini
 
 # 思考轮次上限 (2-50)
 max_tool_rounds: 30
+
+# 工具安全审计 — 高风险工具执行前先由审计模型判断是否放行
+security_audit:
+  # 审计开关
+  enable: false
+  # 审计使用的模型配置；留空跟随全局默认
+  model_config: gemini
+  # 审计使用的请求适配器；留空跟随全局默认
+  adapter: gemini
 
 # 子代理
 agent:
   # 子代理使用的模型配置
   model_config: gemini
-  # 使用的 API
-  api: gemini
+  # 使用的请求适配器
+  adapter: gemini
 
 # 多模态识别 — 主模型配置不支持某类媒体时，用该模型配置识别并转为文本
 multimodal:
   # 多模态识别模型配置
   model_config: gemini
-  # 识别模型使用的 API
-  api: gemini
+  # 识别模型使用的请求适配器
+  adapter: gemini
 
 # 网页搜索
 search:
@@ -141,9 +150,9 @@ embeddings:
   enable: false
   # 连接配置来源：复用该模型配置的 base_url、api_keys 与 proxy 开关
   model_config: gemini
-  # 向量模型使用的 API
+  # 向量模型使用的请求适配器
   # 支持类型: gemini | openai
-  api: gemini
+  adapter: gemini
   # 向量模型
   model: gemini-embedding-001
   # 输出维度
@@ -246,8 +255,8 @@ proactive_group_chat:
   probability: 0
   # 使用的模型配置
   model_config: gemini
-  # 使用的 API 类型
-  api: gemini
+  # 使用的请求适配器
+  adapter: gemini
 
 # 语音合成 (TTS)
 # 服务商: wusound | openai | gemini | minimax | elevenlabs | azure | volcengine | mimo | fishaudio | dashscope
