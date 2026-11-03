@@ -1025,6 +1025,21 @@ code {
   transform: rotate(45deg);
 }
 
+.section-card > .card-body > .section-card {
+  margin: 4px 20px 12px;
+  border-color: var(--separator);
+  border-radius: calc(var(--radius) - 4px);
+  box-shadow: none;
+}
+
+.section-card > .card-body > .section-card > .section-head {
+  padding: 13px 16px;
+}
+
+.section-card > .card-body > .section-card[open] > .section-head {
+  padding-bottom: 6px;
+}
+
 @media (hover: hover) and (pointer: fine) {
   .section-head:hover {
     background: color-mix(in srgb, var(--fill) 46%, transparent);
