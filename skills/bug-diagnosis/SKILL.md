@@ -2,7 +2,6 @@
 name: bug-diagnosis
 description: Reproduce, isolate, and fix a bug, then verify the fix.
 tools: read, grep, glob, pwsh, edit
-master_only: true
 ---
 
 # Bug diagnosis

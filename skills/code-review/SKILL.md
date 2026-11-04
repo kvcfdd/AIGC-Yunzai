@@ -2,7 +2,6 @@
 name: code-review
 description: Review a change for correctness, security, tests, and regressions.
 tools: read, grep, glob, pwsh
-master_only: true
 ---
 
 # Code review

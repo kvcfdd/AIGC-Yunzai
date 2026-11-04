@@ -2,7 +2,6 @@
 name: bot-maintenance
 description: Diagnose bot errors, fix code or config, and add plugins, AIGC tools, or skills.
 tools: read, write, edit, glob, grep, pwsh
-master_only: true
 ---
 
 # Bot maintenance

@@ -108,14 +108,13 @@ Frontmatter:
 name: skill-name
 description: One line describing when to use this skill.
 tools: read, write, edit, pwsh
-master_only: true
 ---
 ```
 
 - Descriptions are shown in the system prompt; keep them under 100 characters.
-- `master_only: true` hides the skill from non-master users and makes `skill` refuse it.
+- Access control is enforced by the master-only action tools at execution time; skills are readable by any caller with the `skill` tool.
 - The `skill` tool returns the body, the declared tools, and a file tree of the skill directory.
-- Supporting files under the skill directory can be read with `read` (master-only skills only).
+- Supporting files under the skill directory can be read with `read` (a master-only action tool).
 - Prefer a short SKILL.md plus `references/*.md` for depth; do not load everything at once.
 - Optional dependencies for a skill belong in `skills/<name>/.deps/`, not the project `package.json`. Tell the model to install them on demand, for example `npm install --prefix skills/<name>/.deps <package>`.
 

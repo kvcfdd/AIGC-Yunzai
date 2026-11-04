@@ -2,7 +2,6 @@
 name: skill-authoring
 description: Create or update Agent Skills under data/skills; use when adding or fixing a skill.
 allowed-tools: read write edit glob grep
-master_only: true
 ---
 
 # Skill authoring
@@ -41,7 +40,7 @@ Must be the first content in the file, delimited by `---`. Standard fields:
 This bot's parser additions and limits:
 
 - Accepts `tools` as an alias of `allowed-tools` (comma- or space-separated).
-- `master_only: true` hides the skill from non-master users and makes `skill` refuse it; use it for anything touching files or commands.
+- Access control is enforced by the master-only action tools (`read`/`write`/`pwsh` etc.) at execution time; skills themselves are readable by any caller with the `skill` tool.
 - The system-prompt skill list shows only `description`, clipped to 100 characters — keep `description` under 100 characters here even though the standard allows 1024.
 - `license`, `compatibility`, and `metadata` are accepted but not surfaced by this bot.
 - Malformed YAML falls back silently to the directory name and the first body line; always set `name` and `description` explicitly.
@@ -53,7 +52,6 @@ Minimal example:
 name: my-skill
 description: Extract data from X and summarize it. Use when the user asks about X.
 allowed-tools: read write
-master_only: true
 ---
 
 # My skill
