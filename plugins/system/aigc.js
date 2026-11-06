@@ -72,7 +72,7 @@ export class AigcFallback extends plugin {
     if (removed) log.info(`上下文清理: 已删除 ${removed} 条超期记录`)
   }
 
-  /** 门控与入口：开关/黑白名单/水群判定 → 交对话服务执行 */
+  /** 门控与入口：开关/黑白名单/旁听判定 → 交对话服务执行 */
   async aigcChat() {
     const decision = await evaluateTrigger({
       event: this.e,

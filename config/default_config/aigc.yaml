@@ -3,7 +3,9 @@ enable: false
 
 # 模型配置列表 — 每个请求适配器只列自己需要的字段
 # 以下是四个请求适配器示例配置，可自行新增兼容模型
+# 建议使用webui界面配置，避免手动编辑
 models:
+    # 唯一标识名，作为 model_config 的引用
   - name: gemini
     # API 基础地址，可填反代
     base_url: https://www.astrdark.cyou/ip/gemini
@@ -20,89 +22,6 @@ models:
     # 失败重试次数 0-10
     retry_count: 0
 
-  - name: openai
-    # OpenAI 兼容接口地址，填到 /v1 这一级
-    base_url: https://api.openai.com/v1
-    # 是否走代理
-    proxy: false
-    # 附加请求头
-    headers: {}
-    # 单次请求超时（毫秒）
-    timeout_ms: 300000
-    # API Key，至少一个
-    api_keys:
-    # 实际模型名；必填
-    model:
-    # 单次输出上限
-    max_output_tokens: 65536
-    # 输出上限字段：max_tokens | max_completion_tokens
-    max_tokens_field: max_tokens
-    # 回传历史 reasoning_content
-    reasoning_replay: true
-    # 失败重试次数 0-10
-    retry_count: 0
-    # 多模态能力；false 时转文本占位
-    media:
-      image: true
-      audio: false
-      video: false
-      file: true
-    # 透传额外请求体；如 { reasoning_effort: "medium", temperature: 1.0 }
-    extra_body: {}
-
-  - name: anthropic
-    # Anthropic 接口地址
-    base_url: https://api.anthropic.com
-    # 是否走代理
-    proxy: false
-    # 附加请求头
-    headers: {}
-    # anthropic-version 请求头
-    api_version: "2023-06-01"
-    # 单次请求超时（毫秒）
-    timeout_ms: 300000
-    # API Key，至少一个
-    api_keys:
-    # 实际模型名；必填
-    model:
-    # 单次输出上限
-    max_output_tokens: 65536
-    # 失败重试次数 0-10
-    retry_count: 0
-    # 多模态能力；false 时转文本占位
-    media:
-      image: true
-      audio: false
-      video: false
-      file: true
-    # 透传额外请求体；如 extended thinking 配置
-    extra_body: {}
-
-  - name: responses
-    # OpenAI Responses 接口地址，填到 /v1 这一级
-    base_url: https://api.openai.com/v1
-    # 是否走代理
-    proxy: false
-    # 附加请求头
-    headers: {}
-    # 单次请求超时（毫秒）
-    timeout_ms: 300000
-    # API Key，至少一个
-    api_keys:
-    # 实际模型名；必填
-    model:
-    # 单次输出Token上限
-    max_output_tokens: 65536
-    # 失败重试次数 0-10
-    retry_count: 0
-    # 多模态能力；false 时转文本占位
-    media:
-      image: true
-      audio: false
-      video: false
-      file: true
-    # 透传额外请求体；如 { reasoning: { effort: "medium" } }
-    extra_body: {}
 
 # 主对话使用的模型配置
 model_config: gemini
@@ -150,27 +69,11 @@ search:
 embeddings:
   # 向量语义检索开关
   enable: false
-  # 连接配置来源：复用该模型配置的 base_url、api_keys 与 proxy 开关
-  model_config: gemini
   # 向量模型使用的请求适配器
-  # 支持类型: gemini | openai
+  # 可选请求适配器: gemini | openai
   adapter: gemini
-  # 向量模型
-  model: gemini-embedding-001
-  # 输出维度
-  dimensions: 768
-  # 单条文本最大字符数，超出截断
-  max_input_chars: 2000
-  # 单次请求超时（毫秒）
-  timeout_ms: 30000
-  # 失败重试次数 0-10
-  retry_count: 3
-  # 附加请求头；如反代鉴权、伪装 UA
-  # headers: { Authorization: "Bearer <token>", User-Agent: "Mozilla/5.0" }
-  headers: {}
-  # 透传额外请求体
-  # extra_body: { title: "对话记录", encoding_format: "float" }
-  extra_body: {}
+  # 向量模型配置
+  model_config: gemini
 
 # 机器人名称(AIGC相关日志显示)
 bot_name: AIGC
@@ -251,7 +154,7 @@ context_retention_days: 0
 # 是否将本轮过程以合并转发方式单独发送
 show_thinking: false
 
-# 水群模式：每条群消息按概率触发，0 表示关闭，LLM自己决定要不要回
+# 旁听模式：每条群消息按概率触发，0 表示关闭，LLM自己决定要不要回
 proactive_group_chat:
   # 触发概率（0-100），0 表示关闭
   probability: 0
