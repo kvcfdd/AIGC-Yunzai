@@ -65,7 +65,7 @@ search:
   # 是否走代理
   proxy: false
 
-# 记忆系统/向量语义检索
+# 向量语义检索
 embeddings:
   # 向量语义检索开关
   enable: false
@@ -74,6 +74,38 @@ embeddings:
   adapter: gemini
   # 向量模型配置
   model_config: gemini
+
+# 文档知识库 — 导入资料供对话检索；向量化复用 aigc.embeddings
+knowledge:
+  # 知识库开关
+  enable: false
+  # 检索模式：auto=主对话每轮自动检索并注入实时状态；tool=仅暴露 kb_search 工具
+  retrieval_mode: tool
+  # 单文件大小上限 (MB)
+  max_file_mb: 20
+  # 分块长度（字符）
+  chunk_size: 512
+  # 相邻分块重叠（字符）
+  chunk_overlap: 50
+  # 每库稠密检索候选数
+  top_k_dense: 50
+  # 每库关键词检索候选数
+  top_k_sparse: 50
+  # 融合后候选数
+  top_k_fusion: 20
+  # 最终返回给模型的条数
+  top_m_final: 5
+  # 稠密权重 (0-1)，其余为稀疏权重
+  dense_weight: 0.9
+  # 稠密相似度下限 (0-1)，0 表示不过滤
+  min_similarity: 0
+  # 可选重排
+  rerank:
+    enable: false
+    # 重排模型配置
+    model_config: rerank
+    # 重排后保留条数
+    top_n: 5
 
 # 机器人名称(AIGC相关日志显示)
 bot_name: AIGC
