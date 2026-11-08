@@ -10,7 +10,10 @@ export class AigcFallback extends plugin {
       dsc: "AIGC 对话",
       event: "message",
       priority: 999999999,
-      task: { name: "AIGC上下文清理", cron: "0 17 4 * * *", fnc: () => this.pruneContext() },
+      task: [
+        { name: "AIGC每日记忆总结", cron: "0 0 0 * * *", fnc: () => this.summarizeMemory() },
+        { name: "AIGC上下文清理", cron: "0 17 4 * * *", fnc: () => this.pruneContext() },
+      ],
       rule: [
         { reg: /^#关闭aigc$/i, fnc: "aigcOff" },
         { reg: /^#开启aigc$/i, fnc: "aigcOn" },
@@ -19,6 +22,11 @@ export class AigcFallback extends plugin {
         { reg: /^[\s\S]+$/, fnc: "aigcChat", log: false },
       ],
     })
+  }
+
+  /** 启动后补跑一次总结 */
+  init() {
+    if (cfg.aigc?.memory?.enable) setTimeout(() => this.summarizeMemory(), 60_000).unref?.()
   }
 
   // 裸 @ 是否进入对话
@@ -48,11 +56,9 @@ export class AigcFallback extends plugin {
     if (Bot.aigc.requestScheduler.abort(this.e)) log.info(`用户 ${this.e.user_id} 结束对话，已中止进行中的请求`)
 
     const memory = Bot.aigc.memory
-    if (!(await memory.hasHistory(this.e.self_id, this.e.user_id))) return this.reply("暂无对话记录", true)
-
     await memory.clearSession(this.e.self_id, this.e.user_id)
-    log.info(`用户 ${this.e.user_id} 清除了对话记录`)
-    return this.reply("对话记录已清除", true)
+    log.info(`用户 ${this.e.user_id} 清除了对话记录与长期记忆`)
+    return this.reply("对话记录与长期记忆已清除", true)
   }
 
   async clearAllConv() {
@@ -62,8 +68,18 @@ export class AigcFallback extends plugin {
     for (const key of keys) log.info(`管理员清除全部对话，已中止用户 ${key.split(":").pop()} 进行中的请求`)
 
     await Bot.aigc.memory.clearAll()
-    log.info("管理员清除了全部用户的对话记录")
-    return this.reply("已清除全部用户的对话记录", true)
+    log.info("管理员清除了全部用户的对话记录与长期记忆")
+    return this.reply("已清除全部用户的对话记录与长期记忆", true)
+  }
+
+  /** 从旧到新补齐每日总结 */
+  async summarizeMemory() {
+    try {
+      const res = await Bot.aigc.memory.summarizeDaily({ config: cfg, provider: Bot.aigc.provider })
+      if (res?.skipped && res.skipped !== "disabled") log.debug(`每日记忆总结跳过: ${res.skipped}`)
+    } catch (err) {
+      log.error(`每日记忆总结失败: ${err.message}`)
+    }
   }
 
   /** 定时清理超出保留期的上下文 */

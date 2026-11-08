@@ -75,6 +75,17 @@ embeddings:
   # 向量模型配置
   model_config: gemini
 
+# 记忆系统
+memory:
+  # 是否启用每日总结
+  enable: false
+  # 总结模型配置；留空跟随主对话
+  model_config:
+  # 总结模型使用的请求适配器；留空跟随全局
+  adapter:
+  # 语义检索重排模型配置
+  rerank_model:
+
 # 文档知识库 — 导入资料供对话检索；向量化复用 aigc.embeddings
 knowledge:
   # 知识库开关
@@ -181,7 +192,7 @@ context_rounds: 30
 context_keep_rounds: 10
 
 # 上下文保留天数，超期轮次由定时任务整轮清理；0 表示不限制
-context_retention_days: 0
+context_retention_days: 30
 
 # 是否将本轮过程以合并转发方式单独发送
 show_thinking: false
