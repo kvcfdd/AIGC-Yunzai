@@ -19,6 +19,8 @@ models:
     thinking_level: high
     # 单次输出上限
     max_output_tokens: 65536
+    # 模型上下文窗口
+    context_window: 1000000
     # 失败重试次数 0-10
     retry_count: 0
 
@@ -174,13 +176,6 @@ prefix_filter:
 
 # 群聊记录携带条数，0 则不携带
 group_history_count: 30
-
-# 上下文携带
-# 历史累计到该轮数后，下一次请求只携带最近 context_keep_rounds 轮；0 则不携带
-context_rounds: 30
-
-# 精简后保留的最近轮数
-context_keep_rounds: 10
 
 # 上下文保留天数，超期轮次由定时任务整轮清理；0 表示不限制
 context_retention_days: 30
