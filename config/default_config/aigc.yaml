@@ -33,15 +33,6 @@ adapter: gemini
 # 思考轮次上限 (2-50)
 max_tool_rounds: 30
 
-# 工具安全审计 — 高风险工具执行前先由审计模型判断是否放行
-security_audit:
-  # 审计开关
-  enable: false
-  # 审计使用的模型配置；留空跟随全局默认
-  model_config: gemini
-  # 审计使用的请求适配器；留空跟随全局默认
-  adapter: gemini
-
 # 子代理
 agent:
   # 子代理使用的模型配置
