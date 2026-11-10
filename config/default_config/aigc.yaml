@@ -20,7 +20,7 @@ models:
     # 单次输出上限
     max_output_tokens: 65536
     # 模型上下文窗口
-    context_window: 1000000
+    context_window: 1048576
     # 失败重试次数 0-10
     retry_count: 0
 
