@@ -1,55 +1,54 @@
 ---
 name: bot-maintenance
-description: Diagnose bot errors, fix code or config, and add plugins, AIGC tools, or skills.
-tools: read, write, edit, glob, grep, pwsh
+description: Maintain the AIGC-Yunzai codebase itself — boot flow, plugins and events, configuration, rendering, and the AIGC subsystem. Use when changing or debugging lib/, plugins/, config/, renderers/, skills/, or when diagnosing bot startup and chat failures.
+tools: read, write, edit, glob, grep, pwsh, bash
 ---
 
 # Bot maintenance
 
-Use this skill when the operator asks you to diagnose or change this bot. Work from the repository root; the process requires it as CWD. Do not assume a `CLAUDE.md` exists: this skill and its references are the maintenance source of truth.
+This skill is the maintenance entry point for AIGC-Yunzai. Classify the task first, then load only the reference you need. Do not load every reference up front.
 
-## Operating loop
+## Reference map
 
-1. Classify the failure: AIGC model/tool, plugin, adapter, config, renderer, database/Redis, or MCP.
-2. Read the smallest relevant source and log excerpt. Do not dump whole files or logs.
-3. State a concrete hypothesis and the evidence for it before editing.
-4. Make the smallest correct change.
-6. Report the change, verification output, and remaining risk. Never claim a fix without passing verification.
+| Task | Read |
+| --- | --- |
+| Boot flow, directory responsibilities, events and plugins, config and storage, rendering, AIGC layers | `references/architecture.md` |
+| Editing code, adding plugins/tools/skills/MCP servers, config changes, verification and formatting | `references/development.md` |
+| Startup failures, messages not triggering, AIGC not replying, renderer or database errors | `references/troubleshooting.md` |
 
-## Repository map
+## Hard constraints
 
-- `app.js` → `lib/bot.js` boot; `lib/ai_core/` is the AI subsystem.
-- `lib/plugins/loader.js` discovers plugins in `plugins/` and dispatches rules.
-- `lib/config/config.js` loads YAML; `config/default_config/` are tracked defaults; `config/config/` are live, gitignored, hot-reloaded copies.
-- `data/` is gitignored runtime state: SQLite `data/db/data.db`, AIGC media, plugin data.
-- `lib/redis/` is a Redis-v4-compatible client over SQLite; there is no Redis server.
-- `lib/renderer/browser.js` is the shared Playwright Chromium singleton; renderer backends live in `renderers/`.
+- Make the smallest change that solves the task. Do not refactor, reformat, or "clean up" unrelated files.
+- Never restart, stop, or force-kill the bot unless the operator explicitly asks. Code under `lib/` and plugins using `index.js` are not hot-reloaded — report that a restart is required instead of restarting.
+- Never run `git reset --hard`, `git clean`, `rm -rf`, or force-push. `plugins/other/maint_task.js` can run `git reset --hard @{u}` on configured paths, destroying uncommitted work.
+- Never print, copy, or write API keys, cookies, or full user logs. Quote only the necessary lines when diagnosing.
+- Change shipped defaults in `config/default_config/`. `config/config/` is the live copy; edit it only when the operator asks.
+- Do not run a repo-wide `pnpm lint` during diagnosis — prettier rewrites every JS file. Format only changed files.
+- Do not expose or weaken WebUI authentication, and do not bind services to the public internet.
+- Shell tooling is platform-selected: the bot registers `pwsh` on Windows and `bash` elsewhere. Only one exists at runtime; use the registered one and do not assume both are callable.
+- Write commit messages in Chinese. Do not commit or push unless asked.
 
-## Commands
+## Workflow
 
-```sh
-node .                 # foreground
-node . dev             # foreground + render data in temp/ViewData
-node . stop            # stop via HTTP /exit
-node . daemon          # supervisor, restarts on exit code 255
-pnpm start|stop|restart|log
-npx prettier --write <changed files>
-```
+1. State whether the task is locate / modify / diagnose, then pick the matching reference.
+2. Locate entry points with `glob` and `grep`; read only the relevant sections with `read`. Check how neighboring code already does it.
+3. Before editing, identify: callers, config keys, data compatibility, master-only constraints, and whether a restart is needed.
+4. Follow project style: ESM, no build step, `semi: false`, double quotes, printWidth 500, Chinese comments.
+5. Verify with `node --check <file>`, re-read the affected code paths, and use logs where behavior is runtime-dependent. Never claim a fix without actual check output.
+6. Report: files changed, why, verification output, restart requirement, and remaining risks.
 
-Never run repo-wide `pnpm lint` while diagnosing; it rewrites every JS file.
+## Where to start
 
-## Where to look next
+- Boot and core: `app.js`, `lib/bot.js`
+- Plugin loading and matching: `lib/plugins/loader.js`, `lib/plugins/plugin.js`
+- Events and listeners: `lib/events/`, `lib/listener/`
+- AIGC entry: `plugins/system/aigc.js`, `lib/ai_core/index.js`
+- Defaults: `config/default_config/*.yaml`; live config: `config/config/*.yaml`
+- Data: `data/db/data.db`; logs: `logs/error.log`, `logs/command/`
 
-- `references/architecture.md` — boot flow, plugin system, config/data, AIGC layers and public API.
-- `references/development.md` — add a plugin, an AIGC tool, or a skill; tests and formatting.
-- `references/troubleshooting.md` — logs, common error patterns, restart and safe-operation rules.
+## Stop and ask
 
-Read only the reference needed for the current task.
-
-## Safety
-
-- Do not run `git reset --hard`, `git clean`, `rm -rf`, or bot stop/restart unless the operator explicitly asks. The scheduled maintenance task can reset plugin repositories.
-- Never print, copy, or commit API keys from `config/config/*.yaml`.
-- Do not overwrite live config; change `config/default_config/` and tell the operator what to merge, unless they asked for the live copy.
-- Code under `lib/` is not hot-reloaded: report that a restart is required; do not kill the process yourself.
-- If verification fails, revert only your own change; never discard unrelated work.
+- The task requires restarting or stopping the live bot, or editing live values in `config/config/`.
+- The task requires deleting data, resetting git, overwriting uncommitted work, changing authentication, or exposing a port.
+- The task requires committing or pushing, or a secret may have leaked.
+- Code behavior conflicts with the docs and neither the code nor logs can decide the answer.

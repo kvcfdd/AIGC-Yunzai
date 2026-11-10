@@ -34,6 +34,8 @@ file_to_url_time: 1
 file_to_url_times:
 # 消息类型统计
 msg_type_count: false
+# 数据保留天数：对话历史、消息统计与 token 统计，超期由定时任务清理；0 表示不限制
+context_retention_days: 30
 # 以/开头转为#
 /→#: false
 

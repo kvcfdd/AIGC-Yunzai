@@ -1,5 +1,6 @@
 import cfg from "../../lib/config/config.js"
 import log from "../../lib/ai_core/helpers/log.js"
+import { DEFAULT_RETENTION_DAYS, pruneStats } from "../../lib/ai_core/memory/retention.js"
 import { evaluateTrigger } from "../../lib/ai_core/perception/trigger.js"
 
 /** AIGC 入口：被 @ 且无命令匹配时触发，支持工具调用、历史检索与长期上下文 */
@@ -12,7 +13,7 @@ export class AigcFallback extends plugin {
       priority: 999999999,
       task: [
         { name: "AIGC每日记忆总结", cron: "0 0 0 * * *", fnc: () => this.summarizeMemory() },
-        { name: "AIGC上下文清理", cron: "0 17 4 * * *", fnc: () => this.pruneContext() },
+        { name: "AIGC数据清理", cron: "0 17 4 * * *", fnc: () => this.pruneContext() },
       ],
       rule: [
         { reg: /^#关闭aigc$/i, fnc: "aigcOff" },
@@ -82,10 +83,17 @@ export class AigcFallback extends plugin {
     }
   }
 
-  /** 定时清理超出保留期的上下文 */
+  /** 定时清理超出保留期的对话历史、消息统计与 token 统计 */
   async pruneContext() {
-    const removed = await Bot.aigc.memory.pruneOld(cfg.aigc?.context_retention_days)
-    if (removed) log.info(`上下文清理: 已删除 ${removed} 条超期记录`)
+    const days = cfg.bot?.context_retention_days ?? DEFAULT_RETENTION_DAYS
+    let removed = 0
+    try {
+      removed = await Bot.aigc.memory.pruneOld(days)
+    } catch (err) {
+      log.warn(`对话历史清理失败: ${err.message}`)
+    }
+    const keys = await pruneStats(globalThis.redis, days)
+    if (removed || keys) log.info(`数据清理: 删除 ${removed} 条超期对话记录、${keys} 个统计键`)
   }
 
   /** 门控与入口：开关/黑白名单/旁听判定 → 交对话服务执行 */

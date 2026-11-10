@@ -32,15 +32,8 @@ model_config: gemini
 # 可选请求适配器: gemini | openai | anthropic | responses
 adapter: gemini
 
-# 思考轮次上限 (2-50)
+# 思考轮次上限 (2-150)
 max_tool_rounds: 30
-
-# 子代理
-agent:
-  # 子代理使用的模型配置
-  model_config: gemini
-  # 使用的请求适配器
-  adapter: gemini
 
 # 多模态识别 — 主模型配置不支持某类媒体时，用该模型配置识别并转为文本
 multimodal:
@@ -176,9 +169,6 @@ prefix_filter:
 
 # 群聊记录携带条数，0 则不携带
 group_history_count: 30
-
-# 上下文保留天数，超期历史由定时任务清理；0 表示不限制
-context_retention_days: 30
 
 # 是否将本轮过程以合并转发方式单独发送
 show_thinking: false
