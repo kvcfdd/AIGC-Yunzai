@@ -181,7 +181,7 @@ Read this when you need to know where code lives or how a request flows. For how
 ### 7.8 Output protocol
 
 - `<voice>text</voice>`: send one voice message; the first non-empty voice block wins and all text is ignored.
-- `<xix>`: split plain text into multiple messages.
+- Auto-split (`aigc.auto_split_max_chars`): non-code plain text shorter than the limit splits into multiple messages on blank lines; `0` (default) disables it.
 - `no_reply`: persist the turn but send nothing.
 - Residual protocol tags are stripped before sending. `@name`/`@QQ` become at-segments, `[face name]` becomes QQ faces.
 - `aigc.show_thinking` sends the tool/thinking trace as a separate forward message.
