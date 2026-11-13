@@ -104,8 +104,6 @@ knowledge:
     # 重排后保留条数
     top_n: 5
 
-# 机器人名称(AIGC相关日志显示)
-bot_name: AIGC
 # 系统提示词
 # 输出格式规范，自行按需写入提示词：
 # 文字与语音二选一，不支持混排
@@ -174,9 +172,12 @@ show_thinking: false
 # 自动分条字符数上限：回复低于该长度时按连续换行分条，0 表示关闭
 auto_split_max_chars: 0
 
-# 旁听模式：每条群消息按概率触发，0 表示关闭，LLM自己决定要不要回
+# 旁听模式：按概率或关键词触发，LLM自己决定要不要回
 proactive_group_chat:
-  # 触发概率（0-100），0 表示关闭
+  # 触发关键词
+  keywords:
+  #  - 云崽
+  # 随机触发概率（0-100），0 表示关闭
   probability: 0
   # 使用的模型配置
   model_config: gemini

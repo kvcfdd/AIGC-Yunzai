@@ -1,5 +1,4 @@
 import cfg from "../../lib/config/config.js"
-import log from "../../lib/ai_core/helpers/log.js"
 import { DEFAULT_RETENTION_DAYS, pruneStats } from "../../lib/ai_core/memory/retention.js"
 import { evaluateTrigger } from "../../lib/ai_core/perception/trigger.js"
 
@@ -54,11 +53,11 @@ export class AigcFallback extends plugin {
 
   // 对话清除
   async clearConv() {
-    if (Bot.aigc.requestScheduler.abort(this.e)) log.info(`用户 ${this.e.user_id} 结束对话，已中止进行中的请求`)
+    if (Bot.aigc.requestScheduler.abort(this.e)) logger.info(`用户 ${this.e.user_id} 结束对话，已中止进行中的请求`)
 
     const memory = Bot.aigc.memory
     await memory.clearSession(this.e.self_id, this.e.user_id)
-    log.info(`用户 ${this.e.user_id} 清除了对话记录与长期记忆`)
+    logger.info(`用户 ${this.e.user_id} 清除了对话记录与长期记忆`)
     return this.reply("对话记录与长期记忆已清除", true)
   }
 
@@ -66,10 +65,10 @@ export class AigcFallback extends plugin {
     if (!this.e.isMaster) return false
 
     const keys = Bot.aigc.requestScheduler.abortAll()
-    for (const key of keys) log.info(`管理员清除全部对话，已中止用户 ${key.split(":").pop()} 进行中的请求`)
+    for (const key of keys) logger.info(`管理员清除全部对话，已中止用户 ${key.split(":").pop()} 进行中的请求`)
 
     await Bot.aigc.memory.clearAll()
-    log.info("管理员清除了全部用户的对话记录与长期记忆")
+    logger.info("管理员清除了全部用户的对话记录与长期记忆")
     return this.reply("已清除全部用户的对话记录与长期记忆", true)
   }
 
@@ -77,9 +76,9 @@ export class AigcFallback extends plugin {
   async summarizeMemory() {
     try {
       const res = await Bot.aigc.memory.summarizeDaily({ config: cfg, provider: Bot.aigc.provider })
-      if (res?.skipped && res.skipped !== "disabled") log.debug(`每日记忆总结跳过: ${res.skipped}`)
+      if (res?.skipped && res.skipped !== "disabled") logger.debug(`每日记忆总结跳过: ${res.skipped}`)
     } catch (err) {
-      log.error(`每日记忆总结失败: ${err.message}`)
+      logger.error(`每日记忆总结失败: ${err.message}`)
     }
   }
 
@@ -90,17 +89,16 @@ export class AigcFallback extends plugin {
     try {
       removed = await Bot.aigc.memory.pruneOld(days)
     } catch (err) {
-      log.warn(`对话历史清理失败: ${err.message}`)
+      logger.warn(`对话历史清理失败: ${err.message}`)
     }
     const keys = await pruneStats(globalThis.redis, days)
-    if (removed || keys) log.info(`数据清理: 删除 ${removed} 条超期对话记录、${keys} 个统计键`)
+    if (removed || keys) logger.info(`数据清理: 删除 ${removed} 条超期对话记录、${keys} 个统计键`)
   }
 
   /** 门控与入口：开关/黑白名单/旁听判定 → 交对话服务执行 */
   async aigcChat() {
     const decision = await evaluateTrigger({
       event: this.e,
-      redis: globalThis.redis,
       scheduler: Bot.aigc.requestScheduler,
     })
     if (!decision.accepted) return false
