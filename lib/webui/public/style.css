@@ -1786,6 +1786,17 @@ code {
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.16);
 }
 
+.input[readonly],
+.input[readonly]:hover,
+.input[readonly]:focus,
+.input[disabled] {
+  background: var(--fill);
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--secondary);
+  cursor: default;
+}
+
 .input.invalid {
   border-color: rgba(255, 59, 48, 0.6);
   box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.14);

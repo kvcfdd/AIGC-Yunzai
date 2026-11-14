@@ -154,18 +154,19 @@ voice:
     - name: wusound
       api: wusound
       proxy: false
-      api_key:
+      api_keys:
       voice_id:
       break_clone: true
       preset: balance
       speech_rate: 1
+      # 通用字段: proxy, api_keys
       # openai: base_url, model, voice, response_format, speed, timeout_ms, headers
       # deepseek: base_url, voice_id, format, filter_markdown, timeout_ms
       # gemini: base_url, model, voice, prefix, timeout_ms
       # minimax: base_url, group_id, model, voice_id, speed, vol, pitch, emotion, language_boost, format, sample_rate, bitrate, timeout_ms
       # elevenlabs: base_url, voice_id, model, output_format, stability, similarity_boost, style, use_speaker_boost, timeout_ms
-      # azure: subscription_key, region, voice, style, role, rate, volume, lang, output_format, timeout_ms
-      # volcengine: api_key, appid, cluster, voice_type, speed_ratio, base_url, timeout_ms
+      # azure: region, voice, style, role, rate, volume, lang, output_format, timeout_ms
+      # volcengine: appid, cluster, voice_type, speed_ratio, base_url, timeout_ms
       # mimo: base_url, model, voice, format, style_prompt, dialect, seed_text, timeout_ms
       # fishaudio: base_url, model, reference_id, character, format, timeout_ms
       # dashscope: base_url, model, voice, language_type, timeout_ms

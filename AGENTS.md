@@ -107,7 +107,7 @@ Built-in: `skills/<name>/SKILL.md` (currently only `skill-authoring`). User skil
 
 ### Voice and faces
 
-`aigc.voice.model_config` selects an entry in `aigc.voice.models[]`; each entry's `api` selects the TTS template: `wusound`, `openai`, `deepseek`, `gemini`, `minimax`, `elevenlabs`, `azure`, `volcengine`, `mimo`, `fishaudio`, `dashscope`. TTS failure falls back to text.
+`aigc.voice.model_config` selects an entry in `aigc.voice.models[]`; each entry's `api` selects the TTS template: `wusound`, `openai`, `deepseek`, `gemini`, `minimax`, `elevenlabs`, `azure`, `volcengine`, `mimo`, `fishaudio`, `dashscope`. `api_keys` (array or delimited string) rotates per synthesis request. TTS failure falls back to text.
 
 QQ face maps are static in `lib/ai_core/helpers/face.js`: `FACE_MAP` is qSid -> name, `FACE_LOOKUP` is name/alias -> qSid. Only numeric qSid (sendable `face` segments) are included; emoji expressions stay Unicode text. Source: SnowLuma `sys-face-catalog.json`; duplicate IDs/names prefer 小黄脸 > QQ黄脸 > 汪汪 > 企鹅 > 其它 > 超级表情.
 
@@ -117,6 +117,6 @@ QQ face maps are static in `lib/ai_core/helpers/face.js`: `FACE_MAP` is qSid -> 
 
 ## WebUI
 
-`lib/webui/` serves a vanilla SPA at `/yunzai` (legacy `/aigc_yunzai` redirects). Features: config editing (form + raw YAML), dashboard (messages, tokens, CPU/memory), knowledge-base management, and Miao help theme management. Core configs are registered in `lib/webui/core-configs.js`; plugin configs and plugin data configs are auto-discovered.
+`lib/webui/` serves a vanilla SPA at `/yunzai` (legacy `/aigc_yunzai` redirects). Features: config editing (form + raw YAML), dashboard (messages, tokens, CPU/memory), knowledge-base management, and Miao help theme management. Core configs are registered in `lib/webui/core-configs.js` (field metadata supports `label`, `description`, `options`, `allowEmpty`, and `readonly`); plugin configs and plugin data configs are auto-discovered.
 
 All `/api` routes require a session. `#登录` (master only, `plugins/system/webui-login.js`) creates a 10-minute single-use key and sends it privately; login exchanges it for a 12-hour HttpOnly `SameSite=Strict` session cookie. Do not weaken this flow.
