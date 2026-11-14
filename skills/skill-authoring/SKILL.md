@@ -12,7 +12,7 @@ Use this skill to create or update a self-authored Agent Skill. The open standar
 
 - Self-authored skill: `data/skills/<name>/SKILL.md` — write here.
 - Built-in skill: `skills/<name>/SKILL.md` — reference only; a user skill overrides a built-in with the same `name`.
-- Never shadow `bot-maintenance`, `bug-diagnosis`, `code-review`, or `skill-authoring` unless the operator asks.
+- `skill-authoring` is the only built-in skill; do not shadow it unless the operator asks.
 
 Standard directory layout (only `SKILL.md` is required):
 
