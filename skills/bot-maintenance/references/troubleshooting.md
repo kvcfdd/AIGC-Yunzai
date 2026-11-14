@@ -179,7 +179,7 @@ The user gets `当前模型不支持该媒体类型，请关闭对应的 media �
 - `no_reply` persists the turn and sends nothing.
 - `aigc.auto_split_max_chars` splits non-code replies shorter than the limit on blank lines; `0` (default) disables it.
 - `<voice>` sends one voice message; the first non-empty voice block wins and text is ignored.
-- Voice failures are TTS-provider specific: check `aigc.voice.provider`, the provider block, API key, voice ID, and `timeout_ms`.
+- Voice failures are TTS-template specific: check `aigc.voice.model_config`, the selected `aigc.voice.models` entry (`api` template, API key, voice ID) and `timeout_ms`.
 - `aigc.show_thinking` sends the turn trace as a separate forward message; disable it if it clutters a group.
 
 ## 6. Rendering

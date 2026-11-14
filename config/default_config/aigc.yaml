@@ -1,29 +1,38 @@
 # AIGC 开关
 enable: false
 
-# 模型配置列表 — 每个请求适配器只列自己需要的字段
-# 以下是四个请求适配器示例配置，可自行新增兼容模型
-# 建议使用webui界面配置，避免手动编辑
-models:
-    # 唯一标识名，作为 model_config 的引用
-  - name: gemini
-    # API 基础地址，可填反代
-    base_url: https://www.astrdark.cyou/ip/gemini
-    # 是否走代理
-    proxy: false
-    # API Key，至少一个；列表或逗号/分号/空白分隔字符串
-    api_keys:
-    # 实际模型名
-    model: gemini-3.8-flash
-    # 思考等级：minimal | low | medium | high
-    thinking_level: high
-    # 单次输出上限
-    max_output_tokens: 65536
-    # 模型上下文窗口
-    context_window: 1048576
-    # 失败重试次数 0-10
-    retry_count: 0
+# 私聊开关
+private_chat_enable: true
 
+# 群里裸 @bot 是否触发LLM
+reply_on_bare_at: false
+
+# 群白名单
+group_whitelist:
+#  - 123456789
+
+# QQ 黑名单
+qq_blacklist:
+#  - 987654321
+
+# 前缀过滤(这并不能拦住自动回复，这只是个示例，但LLM本身可以察觉并自行停止回复)
+prefix_filter:
+  - "[自动回复]"
+
+# 本地代理地址，如 http://127.0.0.1:7890
+proxy:
+
+# 思考轮次上限 (2-150)
+max_tool_rounds: 30
+
+# 群聊记录携带条数，0 则不携带
+group_history_count: 30
+
+# 自动分条字符数上限：回复低于该长度时按连续换行分条，0 表示关闭
+auto_split_max_chars: 0
+
+# 是否将本轮过程以合并转发方式单独发送
+show_thinking: false
 
 # 主对话使用的模型配置
 model_config: gemini
@@ -31,16 +40,6 @@ model_config: gemini
 # 主对话使用的请求适配器
 # 可选请求适配器: gemini | openai | anthropic | responses
 adapter: gemini
-
-# 思考轮次上限 (2-150)
-max_tool_rounds: 30
-
-# 多模态识别 — 主模型配置不支持某类媒体时，用该模型配置识别并转为文本
-multimodal:
-  # 多模态识别模型配置
-  model_config: gemini
-  # 识别模型使用的请求适配器
-  adapter: gemini
 
 # 网页搜索
 search:
@@ -104,15 +103,72 @@ knowledge:
     # 重排后保留条数
     top_n: 5
 
-# 系统提示词
-# 输出格式规范，自行按需写入提示词：
-# 文字与语音二选一，不支持混排
-# 回复语音，使用voice标签包裹文本，一次只发一条，示例：<voice>这是一条语音消息</voice>
-# 直接输出no_reply则表示已读不回，不进行任何输出
-system_prompt: |
-  你是一个智能助手，帮助用户解决问题。请根据用户的需求提供准确、简洁、有用的回答。
-  如果你不确定答案，请坦诚说明，而不是编造信息。
-  请尽量使用中文回答，除非用户明确要求使用其他语言。
+# 多模态识别 — 主模型配置不支持某类媒体时，用该模型配置识别并转为文本
+multimodal:
+  # 多模态识别模型配置
+  model_config: gemini
+  # 识别模型使用的请求适配器
+  adapter: gemini
+
+# 旁听模式：按概率或关键词触发，LLM自己决定要不要回
+proactive_group_chat:
+  # 触发关键词
+  keywords:
+  #  - 云崽
+  # 随机触发概率（0-100），0 表示关闭
+  probability: 0
+  # 使用的模型配置
+  model_config: gemini
+  # 使用的请求适配器
+  adapter: gemini
+
+# 模型配置列表 — 每个请求适配器只列自己需要的字段
+# 以下是四个请求适配器示例配置，可自行新增兼容模型
+# 建议使用webui界面配置，避免手动编辑
+models:
+    # 唯一标识名，作为 model_config 的引用
+  - name: gemini
+    # API 基础地址，可填反代
+    base_url: https://www.astrdark.cyou/ip/gemini
+    # 是否走代理
+    proxy: false
+    # API Key，至少一个；列表或逗号/分号/空白分隔字符串
+    api_keys:
+    # 实际模型名
+    model: gemini-3.8-flash
+    # 思考等级：minimal | low | medium | high
+    thinking_level: high
+    # 单次输出上限
+    max_output_tokens: 65536
+    # 模型上下文窗口
+    context_window: 1048576
+    # 失败重试次数 0-10
+    retry_count: 0
+
+# 语音合成 (TTS)
+# 可选 API 模板: wusound | openai | deepseek | gemini | minimax | elevenlabs | azure | volcengine | mimo | fishaudio | dashscope
+voice:
+  # 使用的语音模型配置
+  model_config: wusound
+  models:
+    - name: wusound
+      api: wusound
+      proxy: false
+      api_key:
+      voice_id:
+      break_clone: true
+      preset: balance
+      speech_rate: 1
+      # openai: base_url, model, voice, response_format, speed, timeout_ms, headers
+      # deepseek: base_url, voice_id, format, filter_markdown, timeout_ms
+      # gemini: base_url, model, voice, prefix, timeout_ms
+      # minimax: base_url, group_id, model, voice_id, speed, vol, pitch, emotion, language_boost, format, sample_rate, bitrate, timeout_ms
+      # elevenlabs: base_url, voice_id, model, output_format, stability, similarity_boost, style, use_speaker_boost, timeout_ms
+      # azure: subscription_key, region, voice, style, role, rate, volume, lang, output_format, timeout_ms
+      # volcengine: api_key, appid, cluster, voice_type, speed_ratio, base_url, timeout_ms
+      # mimo: base_url, model, voice, format, style_prompt, dialect, seed_text, timeout_ms
+      # fishaudio: base_url, model, reference_id, character, format, timeout_ms
+      # dashscope: base_url, model, voice, language_type, timeout_ms
 
 # MCP 工具服务器
 mcp:
@@ -142,163 +198,12 @@ mcp:
   #     cwd: ""                    # 工作目录，留空为项目根目录
   #     timeout_ms: 30000
 
-# 本地代理地址，如 http://127.0.0.1:7890
-proxy:
-
-# 私聊开关
-private_chat_enable: true
-
-# 群里裸 @bot 是否触发LLM
-reply_on_bare_at: false
-
-# 群白名单
-group_whitelist:
-#  - 123456789
-
-# QQ 黑名单
-qq_blacklist:
-#  - 987654321
-
-# 前缀过滤(这并不能拦住自动回复，这只是个示例，但LLM本身可以察觉并自行停止回复)
-prefix_filter:
-  - "[自动回复]"
-
-# 群聊记录携带条数，0 则不携带
-group_history_count: 30
-
-# 是否将本轮过程以合并转发方式单独发送
-show_thinking: false
-
-# 自动分条字符数上限：回复低于该长度时按连续换行分条，0 表示关闭
-auto_split_max_chars: 0
-
-# 旁听模式：按概率或关键词触发，LLM自己决定要不要回
-proactive_group_chat:
-  # 触发关键词
-  keywords:
-  #  - 云崽
-  # 随机触发概率（0-100），0 表示关闭
-  probability: 0
-  # 使用的模型配置
-  model_config: gemini
-  # 使用的请求适配器
-  adapter: gemini
-
-# 语音合成 (TTS)
-# 服务商: wusound | openai | gemini | minimax | elevenlabs | azure | volcengine | mimo | fishaudio | dashscope
-voice:
-  provider: wusound
-  providers:
-    # 悟声 Wusound
-    wusound:
-      proxy: false
-      api_key:
-      voice_id:
-      break_clone: true
-      preset: balance
-      speech_rate: 1
-    # OpenAI 兼容 /audio/speech
-    openai:
-      proxy: false
-      api_key:
-      base_url: "https://api.openai.com/v1"
-      model: "tts-1"
-      voice: "alloy"
-      # wav | mp3 | opus | aac | flac | pcm
-      response_format: "wav"
-      speed: 1
-      timeout_ms: 20000
-      headers: {}
-    # Gemini TTS
-    gemini:
-      proxy: false
-      api_key:
-      base_url: "https://generativelanguage.googleapis.com"
-      model: "gemini-2.5-flash-preview-tts"
-      voice: "Leda"
-      prefix: ""
-      timeout_ms: 20000
-    # MiniMax T2A v2
-    minimax:
-      proxy: false
-      api_key:
-      base_url: "https://api.minimax.chat/v1/t2a_v2"
-      group_id: ""
-      model: "speech-02-turbo"
-      voice_id: "female-shaonv"
-      speed: 1.0
-      vol: 1.0
-      pitch: 0
-      emotion: "auto"
-      language_boost: "auto"
-      format: "wav"
-      sample_rate: 32000
-      bitrate: 128000
-      timeout_ms: 60000
-    # ElevenLabs
-    elevenlabs:
-      proxy: false
-      api_key:
-      base_url: "https://api.elevenlabs.io/v1"
-      voice_id: "JBFqnCBsd6RMkjVDRZzb"
-      model: "eleven_multilingual_v2"
-      output_format: "mp3_44100_128"
-      stability: ""
-      similarity_boost: ""
-      style: ""
-      use_speaker_boost: true
-      timeout_ms: 20000
-    # Azure 语音服务
-    azure:
-      proxy: false
-      subscription_key:
-      region: "eastus"
-      voice: "zh-CN-YunxiaNeural"
-      style: "cheerful"
-      role: "Boy"
-      rate: "1"
-      volume: "100"
-      lang: "zh-CN"
-      output_format: "riff-48khz-16bit-mono-pcm"
-      timeout_ms: 20000
-    # 火山引擎语音合成
-    volcengine:
-      proxy: false
-      api_key:
-      appid:
-      cluster: "volcano_tts"
-      voice_type:
-      speed_ratio: 1.0
-      base_url: "https://openspeech.bytedance.com/api/v1/tts"
-      timeout_ms: 20000
-    # MiMo TTS
-    mimo:
-      proxy: false
-      api_key:
-      base_url: "https://api.xiaomimimo.com/v1"
-      model: "mimo-v2.5-tts"
-      voice: "mimo_default"
-      format: "wav"
-      style_prompt: ""
-      dialect: ""
-      seed_text: "Hello, MiMo, have you had lunch?"
-      timeout_ms: 20000
-    # FishAudio
-    fishaudio:
-      proxy: false
-      api_key:
-      base_url: "https://api.fish.audio/v1"
-      model: "s2-pro"
-      reference_id: ""
-      character: "可莉"
-      format: "wav"
-      timeout_ms: 20000
-    # 阿里云百炼
-    dashscope:
-      proxy: false
-      api_key:
-      base_url: "https://dashscope.aliyuncs.com/api/v1"
-      model: "qwen-tts"
-      voice: "Cherry"
-      language_type: "auto"
-      timeout_ms: 20000
+# 系统提示词
+# 输出格式规范，自行按需写入提示词：
+# 文字与语音二选一，不支持混排
+# 回复语音，使用voice标签包裹文本，一次只发一条，示例：<voice>这是一条语音消息</voice>
+# 直接输出no_reply则表示已读不回，不进行任何输出
+system_prompt: |
+  你是一个智能助手，帮助用户解决问题。请根据用户的需求提供准确、简洁、有用的回答。
+  如果你不确定答案，请坦诚说明，而不是编造信息。
+  请尽量使用中文回答，除非用户明确要求使用其他语言。
