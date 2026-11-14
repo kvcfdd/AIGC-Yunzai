@@ -40,7 +40,7 @@ Must be the first content in the file, delimited by `---`. Standard fields:
 This bot's parser additions and limits:
 
 - Accepts `tools` as an alias of `allowed-tools` (comma- or space-separated).
-- Access control is enforced by the master-only action tools (`read`/`write`/`pwsh` etc.) at execution time; skills themselves are readable by any caller with the `skill` tool.
+- Access control is enforced by the action tools at execution time: `pwsh`/`bash`/`glob`/`grep` are master-only, while `read`/`write`/`edit` are open to all users but non-master callers are limited to `data/aigc/chat`, `data/aigc/tmp`, `temp`, `skills` and `data/skills`; skills themselves are readable by any caller with the `skill` tool.
 - The system-prompt skill list shows only `description`, following the standard 1-1024 character limit.
 - `license`, `compatibility`, and `metadata` are accepted but not surfaced by this bot.
 - Malformed YAML falls back silently to the directory name and the first body line; always set `name` and `description` explicitly.

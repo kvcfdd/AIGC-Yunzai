@@ -99,11 +99,11 @@ Create `lib/ai_core/tools/builtin/XTool.js`, call `tools.register({ name, descri
 - `parameters` must be a complete JSON Schema: `{ type: "object", properties: {...}, required: [...] }`. A flat map is rejected by OpenAI with HTTP 400 (`type: null`).
 - Tool/parameter descriptions in English; put constraints in the schema (`enum`, `minimum`, `maxItems`, ...).
 - `execute(args, ctx)` — `ctx` exposes `event`, `signal`, `config`, `memory`, `llm`, `tools`, `schedule`, `skills`, `redis`, `logger`, `bot`, `injectMessage`. Throwing becomes a tool error result.
-- Master-only tools: add the name to `MASTER_ONLY_TOOLS` in `lib/ai_core/tools/workspace.js`; they stay listed for all users to keep the tool prefix stable.
+- Master-only tools: add the name to `MASTER_ONLY_TOOLS` in `lib/ai_core/tools/workspace.js`; they stay listed for all users to keep the tool prefix stable. `read` / `write` / `edit` are open to all users, but non-master access is limited to `data/aigc/chat`, `data/aigc/tmp`, `temp`, `skills` and `data/skills`.
 
 ### Skills
 
-Built-in: `skills/<name>/SKILL.md` (currently only `skill-authoring`). User skills: `data/skills/<name>/SKILL.md` override by name. Frontmatter: `name`, `description`, `tools` (alias of `allowed-tools`). The `skill` tool returns the body, declared tools, and a directory file tree; supporting files are read with the master-only `read` tool. Optional deps go in `skills/<name>/.deps/`.
+Built-in: `skills/<name>/SKILL.md` (currently only `skill-authoring`). User skills: `data/skills/<name>/SKILL.md` override by name. Frontmatter: `name`, `description`, `tools` (alias of `allowed-tools`). The `skill` tool returns the body, declared tools, and a directory file tree; supporting files are read with the `read` tool (non-master users are limited to the allowed directories). Optional deps go in `skills/<name>/.deps/`.
 
 ### Voice and faces
 
