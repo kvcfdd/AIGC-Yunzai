@@ -41,6 +41,24 @@ model_config: gemini
 # 可选请求适配器: gemini | openai | anthropic | responses
 adapter: gemini
 
+# 工具加载 — 高频工具直接挂载，其余工具通过 tool_view / tool_exec 渐进式调用
+tool_loading:
+  # 直接挂载的原生工具；设为 [] 则只挂载 tool_view / tool_exec
+  native:
+    - read
+    - write
+    - edit
+    - glob
+    - grep
+    - pwsh
+    - bash
+    - skill
+    - media
+    - tool_view
+    - tool_exec
+  # tool_exec 单个工具的超时时间
+  exec_timeout_ms: 120000
+
 # 网页搜索
 search:
   # 搜索源: anysearch | deepseek | tavily | bocha | brave | exa | firecrawl | baidu

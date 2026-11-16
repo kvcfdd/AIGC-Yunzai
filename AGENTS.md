@@ -77,7 +77,7 @@ Events use `<post_type>.<message_type>.<sub_type>`; `Bot.em()` also emits every 
 | `perception/` | Trigger gating, event -> turns, system prompt, injected events, message formatting, media resolution |
 | `llm/` | Provider facade and adapters (`gemini`, `openai`, `anthropic`, `responses`), API-key rotation, retry, model config resolution, proxy dispatch |
 | `core/` | `dialogue.js` single-turn orchestration, `tool-loop.js` tool loop (`max_tool_rounds`), `request-scheduler.js` merge/queue/abort, `tool-compaction.js` context budgets |
-| `tools/` | Tool registry and 18 built-ins (`tools/builtin/`), MCP (`tools/mcp/`), skills (`tools/skills/`), workspace guards |
+| `tools/` | Tool registry and 21 built-ins (`tools/builtin/`), native/deferred tool loading (`tool_view` / `tool_exec`), MCP (`tools/mcp/`), skills (`tools/skills/`), workspace guards |
 | `memory/` | Append-only `aigc_message` history, live `aigc_context`, daily summaries (`aigc_memory_day` + FTS5 + optional sqlite-vec), persistent files under `data/aigc/memory/`, retention and context compression |
 | `embeddings/` | Embedding adapters (`gemini`, `openai`) driven by `aigc.embeddings` |
 | `knowledge/` | Document import, chunking, hybrid dense+sparse retrieval, optional `/rerank` |
@@ -92,6 +92,15 @@ Triggering: `cfg.aigc.enable` (default false), per-user/group whitelists/blackli
 
 Context compression: incremental token counting; thresholds are 20% of the context window for normal users and 65% for the master; compaction keeps 1/10 of turns (min 3, max 10), with a summary model call.
 
+### Tool loading
+
+Only high-frequency tools are mounted as native function definitions. Everything else — including all MCP tools and any built-in not listed in `aigc.tool_loading.native` — is announced in the system prompt inside `<available_tools>` and executed through two meta-tools:
+
+- `tool_view({ tool_names })` returns the deferred tools' full JSON Schemas, permission and source. It rejects native tools and master-only tools for non-master callers.
+- `tool_exec({ calls: [{ name, arguments, call_id? }] })` executes deferred tools in parallel, validates arguments against the tool schema, enforces `MASTER_ONLY_TOOLS` / `enabled`, applies `aigc.tool_loading.exec_timeout_ms`, and returns per-call `{ ok, result | error }`. It rejects native tools, unknown tools and itself.
+
+Defaults live in `DEFAULT_NATIVE_TOOLS` (`lib/ai_core/tools/tool-registry.js`) and `config/default_config/aigc.yaml`. Keep the native list small and stable: the mounted tools array is part of the cached prompt prefix, while `tool_view` results live in the message tail. New built-ins are deferred by default; add their names to the native list if they are used every turn. MCP tools are registered with `source: "mcp:<server>"` and are always deferred unless explicitly listed as native. Tool results are not capped before sending; context compaction may still trim them when the context threshold is exceeded. Persisted copies are capped at `TOOL_CONTENT_MAX` (`lib/ai_core/memory/persist.js`).
+
 ### Adding an AIGC tool
 
 Create `lib/ai_core/tools/builtin/XTool.js`, call `tools.register({ name, description, parameters, execute })`, and add a side-effect import in `lib/ai_core/tools/index.js`.
@@ -99,7 +108,7 @@ Create `lib/ai_core/tools/builtin/XTool.js`, call `tools.register({ name, descri
 - `parameters` must be a complete JSON Schema: `{ type: "object", properties: {...}, required: [...] }`. A flat map is rejected by OpenAI with HTTP 400 (`type: null`).
 - Tool/parameter descriptions in English; put constraints in the schema (`enum`, `minimum`, `maxItems`, ...).
 - `execute(args, ctx)` — `ctx` exposes `event`, `signal`, `config`, `memory`, `llm`, `tools`, `schedule`, `skills`, `redis`, `logger`, `bot`, `injectMessage`. Throwing becomes a tool error result.
-- Master-only tools: add the name to `MASTER_ONLY_TOOLS` in `lib/ai_core/tools/workspace.js`; they stay listed for all users to keep the tool prefix stable. `read` / `write` / `edit` are open to all users, but non-master access is limited to `data/aigc/chat`, `data/aigc/tmp`, `temp`, `skills` and `data/skills`.
+- Master-only tools: add the name to `MASTER_ONLY_TOOLS` in `lib/ai_core/tools/workspace.js`; they stay listed for all users to keep the tool prefix stable. Deferred master-only tools appear in `<available_tools>` with `permission="master"` and are rejected by `tool_view` / `tool_exec` for non-master callers. `read` / `glob` / `grep` / `write` / `edit` are open to all users. Non-master `write` / `edit` (and media local paths) are limited to `data/aigc/chat`, `data/aigc/tmp`, `temp`, `skills` and `data/skills`; `read` / `glob` / `grep` may additionally read `plugins/miao-plugin/resources` (static game data).
 
 ### Skills
 
@@ -113,7 +122,7 @@ QQ face maps are static in `lib/ai_core/helpers/face.js`: `FACE_MAP` is qSid -> 
 
 ### MCP
 
-`lib/ai_core/tools/mcp/manager.js` uses `@modelcontextprotocol/client` v2 with Streamable HTTP, SSE, and stdio transports. Servers are configured under `aigc.mcp.servers` and exposed as `mcp_<name>` tools; a disconnected server removes its tools. `protocol_mode` supports `legacy` (default) and `auto`.
+`lib/ai_core/tools/mcp/manager.js` uses `@modelcontextprotocol/client` v2 with Streamable HTTP, SSE, and stdio transports. Servers are configured under `aigc.mcp.servers` and exposed as `mcp_<name>` tools (deferred by default, called through `tool_view` / `tool_exec`); a disconnected server removes its tools. `protocol_mode` supports `legacy` (default) and `auto`.
 
 ## WebUI
 
