@@ -107,7 +107,7 @@ Built-in: `skills/<name>/SKILL.md` (currently only `skill-authoring`). User skil
 
 ### Voice and faces
 
-`aigc.voice.model_config` selects an entry in `aigc.voice.models[]`; each entry's `api` selects the TTS template: `wusound`, `openai`, `deepseek`, `gemini`, `minimax`, `elevenlabs`, `azure`, `volcengine`, `mimo`, `fishaudio`, `dashscope`. `api_keys` (array or delimited string) rotates per synthesis request. TTS failure falls back to text.
+`aigc.voice.model_config` selects an entry in `aigc.voice.models[]`; each entry's `name` is the TTS provider and the WebUI uses it to pick the template: `wusound`, `openai`, `deepseek`, `gemini`, `minimax`, `elevenlabs`, `azure`, `volcengine`, `mimo`, `fishaudio`, `dashscope`. `api_keys` (array or delimited string) rotates per synthesis request. TTS failure falls back to text.
 
 QQ face maps are static in `lib/ai_core/helpers/face.js`: `FACE_MAP` is qSid -> name, `FACE_LOOKUP` is name/alias -> qSid. Only numeric qSid (sendable `face` segments) are included; emoji expressions stay Unicode text. Source: SnowLuma `sys-face-catalog.json`; duplicate IDs/names prefer 小黄脸 > QQ黄脸 > 汪汪 > 企鹅 > 其它 > 超级表情.
 
