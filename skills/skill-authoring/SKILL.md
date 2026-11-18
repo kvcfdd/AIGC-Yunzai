@@ -6,12 +6,13 @@ allowed-tools: read write edit glob grep
 
 # Skill authoring
 
-Use this skill to create or update a self-authored Agent Skill. The open standard is at https://agentskills.io/specification. Skills are instructions loaded on demand; they are not plugins and cannot add tools.
+Use this skill to create or update a self-authored Agent Skill. The open standard is at https://agentskills.io/specification. Skills are instructions loaded on demand; a skill cannot register tools, but a plugin can ship tools and skills together under `plugins/<plugin>/agent/`.
 
 ## Where skills live in this bot
 
 - Self-authored skill: `data/skills/<name>/SKILL.md` — write here.
 - Built-in skill: `skills/<name>/SKILL.md` — reference only; a user skill overrides a built-in with the same `name`.
+- Plugin skill: `plugins/<plugin>/agent/skills/<name>/SKILL.md` — shipped and versioned with the plugin; read-only. A user skill in `data/skills/` overrides it.
 - `skill-authoring` is the only built-in skill; do not shadow it unless the operator asks.
 
 Standard directory layout (only `SKILL.md` is required):
@@ -40,8 +41,8 @@ Must be the first content in the file, delimited by `---`. Standard fields:
 This bot's parser additions and limits:
 
 - Accepts `tools` as an alias of `allowed-tools` (comma- or space-separated).
-- Access control is enforced by the action tools at execution time: `pwsh`/`bash` are master-only; `read`/`glob`/`grep`/`write`/`edit` are open to all users, but non-master `write`/`edit` are limited to `data/aigc/chat`, `data/aigc/tmp`, `temp`, `skills` and `data/skills`, while `read`/`glob`/`grep` may also read `plugins/miao-plugin/resources`; skills themselves are readable by any caller with the `skill` tool.
-- The system-prompt skill list shows only `description`, following the standard 1-1024 character limit.
+- Access control is enforced by the action tools at execution time: `pwsh`/`bash` are master-only; `read`/`glob`/`grep`/`write`/`edit` are open to all users, but non-master `write`/`edit` are limited to `data/aigc/chat`, `data/aigc/tmp`, `temp`, `skills` and `data/skills`, while `read`/`glob`/`grep` may also read `plugins/miao-plugin/resources` and registered plugin skill directories; skills themselves are readable by any caller with the `skill` tool.
+- The system-prompt skill list shows `name` and `description`; the body is not included.
 - `license`, `compatibility`, and `metadata` are accepted but not surfaced by this bot.
 - Malformed YAML falls back silently to the directory name and the first body line; always set `name` and `description` explicitly.
 
@@ -80,7 +81,8 @@ Reference files with relative paths from the skill root and keep references one 
 ## Workflow
 
 1. Read the current skill list from the system prompt; inspect an existing skill with the `skill` tool.
-2. Pick a lowercase hyphenated name equal to the directory name; confirm it is unused under `skills/` and `data/skills/` with `glob`.
+2. Pick a lowercase hyphenated name equal to the directory name; confirm it is unused in the system prompt skill list (which includes built-in, plugin and user skills), or with `glob` under `skills/`, `plugins/*/agent/skills/` and `data/skills/` when accessible.
+   For a plugin skill, declare the plugin's tool names in `tools`; the `skill` tool reports them to the model.
 3. Write `data/skills/<name>/SKILL.md` with `write`.
 4. Validate:
    - Standard check, if available: `skills-ref validate data/skills/<name>`.
@@ -93,5 +95,6 @@ Reference files with relative paths from the skill root and keep references one 
 - Duplicating a built-in skill without adding value.
 - Vague descriptions such as "helps with tasks" — they never trigger.
 - Declaring tools the current user cannot use.
+- Editing a plugin's skill in place; copy it to `data/skills/` to override it instead.
 - A body that restates general knowledge instead of project-specific procedure.
 - Keeping mutable state or generated output inside the skill directory; use project data paths instead.

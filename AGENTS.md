@@ -4,7 +4,7 @@
 
 AIGC-Yunzai is a QQ bot (Node.js ESM, no build step) with an integrated AIGC subsystem (LLM chat, tools, memory, knowledge base, TTS). Requirements: Node.js >= 24.16, pnpm, FFmpeg. Run commands from the repository root; plugin/listener discovery and runtime data paths are cwd-relative.
 
-Key directories: `app.js` (entry), `lib/` (core), `plugins/` (plugins and adapters), `renderers/` (screenshot backends), `config/` (defaults + live copies), `data/` (runtime state), `skills/` (built-in skills), `test/` (local-only tests, gitignored).
+Key directories: `app.js` (entry), `lib/` (core), `plugins/` (plugins and adapters), `renderers/` (screenshot backends), `config/` (defaults + live copies), `data/` (runtime state), `skills/` (built-in skills), `plugins/<plugin>/agent/` (plugin-provided tools and skills), `test/` (local-only tests, gitignored).
 
 ## Commands
 
@@ -32,7 +32,7 @@ Ports: bot HTTP/WS `2536`; WebUI `http://localhost:2536/yunzai`; renderer HTTP `
 1. config + logger init (`lib/config/init.js`)
 2. `lib/ai_core` init, including MCP servers and scheduled tasks
 3. HTTP/WS server on `cfg.server.port` (2536), WebUI mount, optional HTTPS
-4. `PluginsLoader.load()` (`lib/plugins/loader.js`)
+4. `PluginsLoader.load()` (`lib/plugins/loader.js`), then `Bot.aigc.pluginAssets.load(PluginsLoader.loadedDirs)` for plugin-provided tools and skills
 5. `ListenerLoader.load()` (scans `lib/events/*.js`, then adapters)
 6. `emit("online")`
 
@@ -70,7 +70,7 @@ Events use `<post_type>.<message_type>.<sub_type>`; `Bot.em()` also emits every 
 
 ## AIGC subsystem (`lib/ai_core/`)
 
-`Bot.aigc` exposes `provider`, `memory` (alias `conversation`), `tools`, `mcp`, `skills`, `knowledge`, `voice`, `requestScheduler` (alias `coordinator`), `dialogue`, `schedule`, `config`, `AigcError`, `injectMessage`. The user-facing entry is `plugins/system/aigc.js` — priority `999999999` (runs last) with a catch-all rule plus `#开启aigc` / `#关闭aigc` / `#结束对话` / `#结束全部对话`.
+`Bot.aigc` exposes `provider`, `memory` (alias `conversation`), `tools`, `mcp`, `skills`, `pluginAssets`, `knowledge`, `voice`, `requestScheduler` (alias `coordinator`), `dialogue`, `schedule`, `config`, `AigcError`, `injectMessage`. The user-facing entry is `plugins/system/aigc.js` — priority `999999999` (runs last) with a catch-all rule plus `#开启aigc` / `#关闭aigc` / `#结束对话` / `#结束全部对话`.
 
 | Layer | Responsibility |
 |---|---|
@@ -78,6 +78,7 @@ Events use `<post_type>.<message_type>.<sub_type>`; `Bot.em()` also emits every 
 | `llm/` | Provider facade and adapters (`gemini`, `openai`, `anthropic`, `responses`), API-key rotation, retry, model config resolution, proxy dispatch |
 | `core/` | `dialogue.js` single-turn orchestration, `tool-loop.js` tool loop (`max_tool_rounds`), `request-scheduler.js` merge/queue/abort, `tool-compaction.js` context budgets |
 | `tools/` | Tool registry and 21 built-ins (`tools/builtin/`), native/deferred tool loading (`tool_view` / `tool_exec`), MCP (`tools/mcp/`), skills (`tools/skills/`), workspace guards |
+| `plugin-assets.js` | Discovers `plugins/<plugin>/agent/{tools,skills}` for loaded plugins; plugin tools are registered with `source: "plugin:<name>"` and are always deferred |
 | `memory/` | Append-only `aigc_message` history, live `aigc_context`, daily summaries (`aigc_memory_day` + FTS5 + optional sqlite-vec), persistent files under `data/aigc/memory/`, retention and context compression |
 | `embeddings/` | Embedding adapters (`gemini`, `openai`) driven by `aigc.embeddings` |
 | `knowledge/` | Document import, chunking, hybrid dense+sparse retrieval, optional `/rerank` |
@@ -97,9 +98,11 @@ Context compression: incremental token counting; thresholds are 20% of the conte
 Only high-frequency tools are mounted as native function definitions. Everything else — including all MCP tools and any built-in not listed in `aigc.tool_loading.native` — is announced in the system prompt inside `<available_tools>` and executed through two meta-tools:
 
 - `tool_view({ tool_names })` returns the deferred tools' full JSON Schemas, permission and source. It rejects native tools and master-only tools for non-master callers.
-- `tool_exec({ calls: [{ name, arguments, call_id? }] })` executes deferred tools in parallel, validates arguments against the tool schema, enforces `MASTER_ONLY_TOOLS` / `enabled`, applies `aigc.tool_loading.exec_timeout_ms`, and returns per-call `{ ok, result | error }`. It rejects native tools, unknown tools and itself.
+- `tool_exec({ calls: [{ name, arguments, call_id? }] })` executes deferred tools in parallel, validates arguments against the tool schema, enforces master-only permission (`permission="master"` or `MASTER_ONLY_TOOLS`) / `enabled`, applies `aigc.tool_loading.exec_timeout_ms`, and returns per-call `{ ok, result | error }`. It rejects native tools, unknown tools and itself.
 
-Defaults live in `DEFAULT_NATIVE_TOOLS` (`lib/ai_core/tools/tool-registry.js`) and `config/default_config/aigc.yaml`. Keep the native list small and stable: the mounted tools array is part of the cached prompt prefix, while `tool_view` results live in the message tail. New built-ins are deferred by default; add their names to the native list if they are used every turn. MCP tools are registered with `source: "mcp:<server>"` and are always deferred unless explicitly listed as native. The `<available_tools>` catalog is not length-capped; descriptions up to 250 chars are kept, longer ones are cut to 240 chars with an omitted-count marker. Tool results are not capped before sending; context compaction may still trim them when the context threshold is exceeded. Persisted copies are capped at `TOOL_CONTENT_MAX` and the clipped copy carries an `(已省略x字符)` marker (`lib/ai_core/memory/persist.js`). Multimodal results from deferred tools (`images` / `audios` / `videos` / `files` and their `*_paths`) are forwarded by `tool_exec` outside its JSON text and size budget; MCP `image` / `audio` content is converted to data URIs, so it reaches the adapters through the same media pipeline as native tool results.
+Defaults live in `DEFAULT_NATIVE_TOOLS` (`lib/ai_core/tools/tool-registry.js`) and `config/default_config/aigc.yaml`. Keep the native list small and stable: the mounted tools array is part of the cached prompt prefix, while `tool_view` results live in the message tail. New built-ins are deferred by default; add their names to the native list if they are used every turn. MCP tools are registered with `source: "mcp:<server>"` and are always deferred unless explicitly listed as native. Plugin tools from `plugins/<plugin>/agent/tools/*.js` are always deferred regardless of `aigc.tool_loading.native`; they are registered with `source: "plugin:<plugin>"` and may declare `permission: "master"`. The catalog is sorted by source (builtin → plugin → MCP) but only renders name and description; provenance and permission remain available through `tool_view`, and non-master restrictions are listed once in the runtime `<permission_policy>`.
+
+The system prompt is built from `<persona>`, `<capability_protocol>`, `<skills>`, `<available_tools>`, and `<system_policies>`; dynamic runtime context stays in the user message's `<Real_time_status>` block and is not persisted. The `<available_tools>` catalog is not length-capped; descriptions up to 250 chars are kept, longer ones are cut to 240 chars with an omitted-count marker. `tool_view` returns up to 600 chars; plugin tool definitions must not exceed that. Tool results are not capped before sending; context compaction may still trim them when the context threshold is exceeded. Persisted copies are capped at `TOOL_CONTENT_MAX` and the clipped copy carries an `(已省略x字符)` marker (`lib/ai_core/memory/persist.js`). Multimodal results from deferred tools (`images` / `audios` / `videos` / `files` and their `*_paths`) are forwarded by `tool_exec` outside its JSON text and size budget; MCP `image` / `audio` content is converted to data URIs, so it reaches the adapters through the same media pipeline as native tool results.
 
 ### Adding an AIGC tool
 
@@ -108,11 +111,22 @@ Create `lib/ai_core/tools/builtin/XTool.js`, call `tools.register({ name, descri
 - `parameters` must be a complete JSON Schema: `{ type: "object", properties: {...}, required: [...] }`. A flat map is rejected by OpenAI with HTTP 400 (`type: null`).
 - Tool/parameter descriptions in English; put constraints in the schema (`enum`, `minimum`, `maxItems`, ...).
 - `execute(args, ctx)` — `ctx` exposes `event`, `signal`, `config`, `memory`, `llm`, `tools`, `schedule`, `skills`, `redis`, `logger`, `bot`, `injectMessage`. Throwing becomes a tool error result.
-- Master-only tools: add the name to `MASTER_ONLY_TOOLS` in `lib/ai_core/tools/workspace.js`; they stay listed for all users to keep the tool prefix stable. Deferred master-only tools appear in `<available_tools>` with `permission="master"` and are rejected by `tool_view` / `tool_exec` for non-master callers. `read` / `glob` / `grep` / `write` / `edit` are open to all users. Non-master `write` / `edit` (and media local paths) are limited to `data/aigc/chat`, `data/aigc/tmp`, `temp`, `skills` and `data/skills`; `read` / `glob` / `grep` may additionally read `plugins/miao-plugin/resources` (static game data).
+- Master-only tools: add the name to `MASTER_ONLY_TOOLS` in `lib/ai_core/tools/workspace.js`; they stay listed for all users to keep the tool prefix stable. Plugin tools use `permission: "master"` instead. Non-master runtime `<permission_policy>` lists the restricted tools, and `tool_view` / `tool_exec` reject them for non-master callers. `read` / `glob` / `grep` / `write` / `edit` are open to all users. Non-master `write` / `edit` (and media local paths) are limited to `data/aigc/chat`, `data/aigc/tmp`, `temp`, `skills` and `data/skills`; `read` / `glob` / `grep` may additionally read `plugins/miao-plugin/resources` (static game data) and registered plugin skill directories.
+
+### Plugin-provided tools and skills
+
+Plugins ship agent assets under `plugins/<plugin>/agent/`; `lib/ai_core/plugin-assets.js` scans only directories returned by `PluginsLoader.loadedDirs` after plugin loading. A pure asset plugin still needs a valid plugin class exported from a `.js` entry, otherwise `PluginsLoader` does not list its directory.
+
+- Tool: `agent/tools/<name>.js` default-exports `{ name, description, parameters, execute, permission? }`. `name` must be 1-64 chars of `A-Za-z0-9_-`, should use a `<plugin>_` prefix, must not start with `mcp_`, and must not collide with a built-in, MCP or other plugin tool. `description` is required and must not exceed 600 chars (the `tool_view` limit; the catalog shows the first 240). `parameters` must be a complete object JSON Schema; `permission` is `"all"` (default) or `"master"`. Use `"master"` for tools that touch the shell, files, accounts, or the project. Plugin tools are always deferred. Keep module top level side-effect free; do network or filesystem work in `execute`, which may run in parallel with other deferred tools and should respect `ctx.signal`.
+- Skill: `agent/skills/<name>/SKILL.md`, same frontmatter as built-in skills. Plugin skills rank below built-in and user skills; a user skill with the same name overrides. Plugin skill directories are added to the non-master read allowlist so `read` can open `references/` and `scripts/`.
+- Results: return text or `{ text, images, audios, videos, files }`; for custom OneBot segments (music cards, forwards), send them with `ctx.event.reply` and return a short status.
+- Dynamic tools registered programmatically must pass `source: "plugin:<name>"` to `tools.register`; that source makes them always deferred. The startup loader does not manage them.
+- Lifecycle: `Bot.aigc.pluginAssets.load(PluginsLoader.loadedDirs)` runs once at startup for loaded plugins; installing, removing or editing plugin assets requires a bot restart. Plugin hot reload does not re-run `init()`, so tool modules should not depend on init-only state.
+- Prompt: skills and tools stay in separate blocks; entries use `<skill>` / `<tool>` and are sorted by `source` (builtin → plugin → mcp/user). `source` and `permission` are not rendered in the prompt; `tool_view` returns them on demand.
 
 ### Skills
 
-Built-in: `skills/<name>/SKILL.md` (currently only `skill-authoring`). User skills: `data/skills/<name>/SKILL.md` override by name. Frontmatter: `name`, `description`, `tools` (alias of `allowed-tools`). The `skill` tool returns the body, declared tools, and a directory file tree; supporting files are read with the `read` tool (non-master users are limited to the allowed directories). Optional deps go in `skills/<name>/.deps/`.
+Built-in: `skills/<name>/SKILL.md` (currently only `skill-authoring`). Plugin skills: `plugins/<plugin>/agent/skills/<name>/SKILL.md`, shipped read-only with the plugin. User skills: `data/skills/<name>/SKILL.md` override built-in and plugin skills by name. Frontmatter: `name`, `description`, `tools` (alias of `allowed-tools`). The `skill` tool returns the body, declared tools, source, and a directory file tree; supporting files are read with the `read` tool (non-master users are limited to the allowed directories). Optional deps go in `skills/<name>/.deps/`.
 
 ### Voice and faces
 
