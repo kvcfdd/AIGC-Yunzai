@@ -1,0 +1,21 @@
+# QQbot适配器
+
+# 是否启用
+enable: false
+
+# 机器人列表，可同时连接多个
+bots:
+  # # 机器人 AppID
+  - appid:
+    # 机器人 AppSecret
+    secret:
+    # 连接方式：websocket / webhook
+    # webhook 由 SDK 单独监听 webhook_port + webhook_path，需在 QQ 开放平台填写对应回调地址
+    mode: websocket
+    # markdown 消息格式
+    markdown: false
+    # 被动回复模式，启用后机器人不会主动发送消息，只会被动响应消息
+    passive_reply: false
+    # webhook 相关配置，仅在 mode 为 webhook 时生效
+    webhook_port: 6196
+    webhook_path: /QQBot

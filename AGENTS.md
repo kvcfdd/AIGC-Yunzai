@@ -23,7 +23,7 @@ npx prettier --write <changed files>
 node --test --test-force-exit test/ai_core/<file>.test.js
 ```
 
-Ports: bot HTTP/WS `2536`; WebUI `http://localhost:2536/yunzai`; renderer HTTP `1134` (disabled by default); `pnpm web` debug viewer `8000`.
+Ports: bot HTTP/WS `2536`; WebUI `http://localhost:2536/yunzai`; renderer HTTP `1134` (disabled by default); QQBot webhook `6196` default (per-bot `cfg.qqbot.bots[].webhook_port`, only when that bot's mode is `webhook`); `pnpm web` debug viewer `8000`.
 
 ## Boot
 
@@ -38,7 +38,7 @@ Ports: bot HTTP/WS `2536`; WebUI `http://localhost:2536/yunzai`; renderer HTTP `
 
 `Bot` is a Proxy over `Bot.bots`; unknown properties fall through to `lib/util.js` helpers or a random logged-in account. Each account is `Bot[self_id]` with `pickFriend` / `pickGroup` / `sendApi`. Globals: `Bot`, `plugin`, `segment`, `logger`, `redis`.
 
-Adapters self-register in `plugins/adapter/*.js`: `OneBotv11` (reverse WS `/OneBotv11`), `GSUIDClient` (outbound WS to 早柚核心, only when `cfg.gsuid.enable`), `stdin` (TTY or `FORCE_TTY`).
+Adapters self-register in `plugins/adapter/*.js`: `OneBotv11` (reverse WS `/OneBotv11`), `GSUIDClient` (outbound WS to 早柚核心, only when `cfg.gsuid.enable`), `QQBot` (qq-official-bot SDK, multiple bots from `cfg.qqbot.bots`, group/C2C messages plus member/friend/join-request/interaction notices, WebSocket or Webhook per bot), `stdin` (TTY or `FORCE_TTY`). The QQ official API has no history endpoint; `QQBot` exposes a bounded in-memory cache of messages received since startup through `getChatHistory` / `getMsg`.
 
 Events use `<post_type>.<message_type>.<sub_type>`; `Bot.em()` also emits every parent prefix, so `event: "message"` catches all message subtypes. Listeners are not awaited.
 
