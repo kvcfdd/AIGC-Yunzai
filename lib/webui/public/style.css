@@ -91,6 +91,11 @@ body {
     color 240ms ease;
 }
 
+body.modal-open {
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
 html {
   scrollbar-color: color-mix(in srgb, var(--secondary) 34%, transparent) transparent;
   scrollbar-width: thin;
@@ -588,6 +593,12 @@ code {
   align-items: center;
   justify-content: space-between;
   margin-top: 4px;
+}
+
+.foot-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .foot-actions a {
@@ -2956,6 +2967,7 @@ code {
   transition: opacity 160ms ease;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  overscroll-behavior: contain;
 }
 
 .dialog-wrap.open {
@@ -2964,11 +2976,15 @@ code {
 
 .dialog-card {
   width: min(330px, 100%);
+  max-height: calc(100dvh - 40px);
   padding: 20px;
   border: 1px solid var(--card-border);
   border-radius: 18px;
   background: var(--card);
   box-shadow: var(--shadow);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   opacity: 0;
   transform: translateY(6px) scale(0.97);
   transition:
@@ -3011,6 +3027,8 @@ code {
   max-height: min(52vh, 420px);
   margin-top: 14px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   padding-right: 2px;
 }
 
@@ -3103,6 +3121,7 @@ code {
   transition: opacity 160ms ease;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  overscroll-behavior: contain;
 }
 
 .editor-wrap.open {
@@ -3119,6 +3138,8 @@ code {
   border-radius: 18px;
   background: var(--card);
   box-shadow: var(--shadow);
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   opacity: 0;
   transform: translateY(8px) scale(0.985);
   transition:
@@ -3164,6 +3185,7 @@ code {
   outline: none;
   resize: none;
   caret-color: var(--blue);
+  overscroll-behavior: contain;
 }
 
 .editor-area:focus {
@@ -3693,6 +3715,10 @@ code {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   gap: 18px;
+}
+
+.dash-grid > * {
+  min-width: 0;
 }
 
 .dash-grid .card {

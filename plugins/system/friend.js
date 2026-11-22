@@ -34,7 +34,8 @@ export class friend extends plugin {
     if (nickname) this.e.nickname = nickname
 
     if (cfg.other.noticeFriend !== 0) {
-      Bot.sendMasterMsg(msg, undefined, 0)
+      logger.mark(`[好友申请] ${bot_id} <- ${user_id}${nickname ? `(${nickname})` : ""}`)
+      Bot.sendMasterMsg(msg, bot_id, 0)
     }
 
     if (willAuto) {

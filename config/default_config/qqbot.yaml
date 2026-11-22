@@ -12,9 +12,9 @@ bots:
     # 连接方式：websocket / webhook
     # webhook 由 SDK 单独监听 webhook_port + webhook_path，需在 QQ 开放平台填写对应回调地址
     mode: websocket
-    # markdown 消息格式
-    markdown: false
-    # 被动回复模式，启用后机器人不会主动发送消息，只会被动响应消息
+    # 普通消息开关：开启后始终以普通消息发送，需要markdown 消息格式则关闭
+    reply_text: true
+    # 被动回复模式：开启时优先被动；关闭时优先主动，皆会自动降级切换
     passive_reply: false
     # webhook 相关配置，仅在 mode 为 webhook 时生效
     webhook_port: 6196

@@ -1,6 +1,7 @@
 import fs from "node:fs/promises"
 import { ulid } from "ulid"
 import YAML from "yaml"
+import cfg from "../../lib/config/config.js"
 const code = {}
 const file = "config/config/other.yaml"
 export class master extends plugin {
@@ -54,6 +55,7 @@ export class master extends plugin {
     if (this.e.msg?.trim().toUpperCase() === code[`${this.e.self_id}:${this.e.user_id}`]) {
       await this.edit(file, "masterQQ", this.e.user_id)
       await this.edit(file, "master", `${this.e.self_id}:${this.e.user_id}`)
+      cfg.reloadConfig?.("other")
       return this.reply(`[${this.e.user_id}] 设置主人完成`, true)
     } else {
       return this.reply("验证码错误", true)

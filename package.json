@@ -13,7 +13,8 @@
     "stop": "pm2 stop config/pm2.yaml",
     "restart": "pm2 restart config/pm2.yaml",
     "log": "pm2 log --lines 100",
-    "lint": "prettier --write \"**/*.js\""
+    "lint": "prettier --write \"**/*.js\"",
+    "test": "node --test --test-force-exit \"test/**/*.test.js\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

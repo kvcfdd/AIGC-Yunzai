@@ -40,7 +40,8 @@ export class invite extends plugin {
     if (nickname) this.e.nickname = nickname
 
     if (cfg.other.noticeGroup !== 0) {
-      Bot.sendMasterMsg(msg, undefined, 0)
+      logger.mark(`[群邀请] ${bot_id} <- ${group_id}${groupName ? `(${groupName})` : ""}`)
+      Bot.sendMasterMsg(msg, bot_id, 0)
     }
 
     if (!willAuto) {

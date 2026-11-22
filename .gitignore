@@ -10,7 +10,6 @@
 /renderers/*/config.yaml
 /resources
 /skills/*/.deps
-/test
 /dump.rdb
 /pnpm-lock.yaml
 /*.sh
