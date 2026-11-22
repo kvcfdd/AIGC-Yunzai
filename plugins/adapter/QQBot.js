@@ -329,7 +329,7 @@ async function toSilk(source, name = "voice") {
   }
 }
 
-export class QQBotInstance {
+class QQBotInstance {
   id = "QQBot"
   name = "QQ官方机器人"
   sdk = null
