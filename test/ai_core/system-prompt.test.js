@@ -43,6 +43,53 @@ test("system prompt: 工具描述 250 字内保留，超出截断到 240 并标�
   assert.ok(prompt.includes(`<tool name="cut">${"y".repeat(240)}(已省略11字符)</tool>`))
 })
 
+test("system prompt: 插件目录替代插件工具与技能", async () => {
+  const builder = new SystemPromptBuilder({
+    event,
+    skills: {
+      list: async () => [
+        { name: "builtin-skill", description: "内置技能", source: "builtin" },
+        { name: "plugin-skill", description: "插件技能", source: "plugin:demo" },
+      ],
+    },
+    tools: {
+      catalog: () => [
+        { name: "builtin_tool", description: "内置工具", source: "builtin", permission: "all" },
+        { name: "demo_tool", description: "插件工具", source: "plugin:demo", permission: "all" },
+      ],
+    },
+    pluginAssets: { get: name => (name === "demo" ? { name: "demo", description: "演示插件：回显与点歌" } : null) },
+    config,
+  })
+  const prompt = await builder.buildSystemPrompt()
+
+  assert.match(prompt, /<plugins>[\s\S]*<plugin name="demo">演示插件：回显与点歌<\/plugin>[\s\S]*<\/plugins>/)
+  assert.match(prompt, /<skill name="builtin-skill">内置技能<\/skill>/)
+  assert.match(prompt, /<tool name="builtin_tool">内置工具<\/tool>/)
+  assert.match(prompt, /plugin_view/)
+  assert.doesNotMatch(prompt, /plugin-skill/)
+  assert.doesNotMatch(prompt, /demo_tool/)
+  assert.ok(prompt.indexOf("<plugins>") < prompt.indexOf("<available_tools>"))
+})
+
+test("system prompt: 非 bot_owner 权限提示不含插件工具", async () => {
+  const builder = new SystemPromptBuilder({
+    event: { ...event, isMaster: false },
+    skills: { list: async () => [] },
+    tools: {
+      catalog: () => [
+        { name: "pwsh", description: "", source: "builtin", permission: "master" },
+        { name: "demo_tool", description: "", source: "plugin:demo", permission: "master" },
+      ],
+    },
+    config,
+  })
+  const runtime = await builder.buildRuntimeContext(false, {})
+
+  assert.match(runtime, /pwsh/)
+  assert.doesNotMatch(runtime, /demo_tool/)
+})
+
 test("system prompt: 有工具时包含 capability_protocol", async () => {
   const builder = new SystemPromptBuilder({
     event,

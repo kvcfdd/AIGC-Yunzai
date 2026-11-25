@@ -2,7 +2,7 @@
 
 ## 1. 项目定位
 
-AIGC-Yunzai 两部分组成：
+AIGC-Yunzai 由两部分组成：
 
 1. **Bot 宿主框架**：适配器接入、事件分发、插件运行时、配置、渲染、WebUI、SQLite 持久化。
 2. **内置 LLM Agent**：触发感知、单轮对话编排、工具调用循环、记忆、知识库、技能、MCP、TTS、定时注入。
@@ -119,7 +119,7 @@ QQ / OneBot / QQBot / GSUID / stdin
 - **OneBotv11**：反向 WebSocket，路径 `/OneBotv11`；把 OneBot 事件转成统一事件，把统一消息段转成 OneBot API 调用。
 - **QQBot**：QQ 开放平台官方 SDK，支持 WebSocket / Webhook，处理 Markdown、按钮、被动回复等平台差异。
 - **GSUIDClient**：作为客户端连接早柚核心。
-- **stdin**：交互式终端输入，默认主人；用于无协议端时本地调试。
+- **stdin**：交互式终端输入，默认 bot_owner；用于无协议端时本地调试。
 
 需要反向 WebSocket 的适配器通过 `Bot.wsf` 注册路径处理器，所有适配器都通过 `Bot.em()` 投递事件。平台差异被收敛在适配器内部，插件层只面对统一事件对象。
 
@@ -253,7 +253,7 @@ QQ / OneBot / QQBot / GSUID / stdin
 
 ### 6.2 配置域
 
-- `other`：主人、黑白名单、私聊策略、加好友/入群策略。
+- `other`：bot_owner、黑白名单、私聊策略、加好友/入群策略。
 - `server`：HTTP/WS 端口、URL、鉴权、HTTPS。
 - `bot`：日志等级、插件加载超时、消息统计、数据保留、定时更新/重启。
 - `group`：群级冷却、@ 策略、别名、功能启停。
@@ -266,7 +266,7 @@ QQ / OneBot / QQBot / GSUID / stdin
 
 WebUI 位于 `lib/webui`，与主服务共用 Express，挂载在 `/yunzai`：
 
-- 主人发送 `#登录` 获取一次性密钥，换取会话 Cookie；
+- bot_owner 发送 `#登录` 获取一次性密钥，换取会话 Cookie；
 - 配置编辑支持“按 schema 的字段编辑”和“原始 YAML 编辑”；
 - 配置写入走原子替换，并触发宿主缓存失效；
 - 同时提供仪表盘、知识库管理、miao 帮助主题管理。
@@ -385,7 +385,7 @@ WebUI 只管理宿主核心配置；游戏插件自己的配置体系（如 miao
 ### 9.1 分层总览
 
 ```
-QQ 消息 / 注入消息 / 定时任务
+适配器消息 / 注入消息 / 定时任务
               │
               ▼
        感知层：trigger / turn-input / media-resolver / system-prompt
@@ -498,23 +498,24 @@ AIGC 的入口是 `plugins/system/aigc.js`：
 
 - 工具定义：`name` / `description` / `parameters`（JSON Schema）/ `execute` / `permission` / `enabled` / `source`。
 - **渐进式加载**：只有 `aigc.tool_loading.native` 中的工具直接挂载为函数定义；其余工具通过 `tool_view` 查看 schema、通过 `tool_exec` 执行。
-- 插件工具与 MCP 工具始终是渐进式；`tool_view` / `tool_exec` 本身始终直接挂载。
-- 工具执行上下文由 `tool-context.js` 注入服务（配置、记忆、LLM、调度、技能、Redis、日志、Bot、注入器），工具不直接依赖全局单例。
+- 插件工具与 MCP 工具始终是渐进式；`tool_view` / `tool_exec` / `plugin_view` 本身始终直接挂载。
+- 插件工具不直接进入 `<available_tools>`：提示词只展示 `<plugins>` 插件目录（名称 + 插件级描述），模型用 `plugin_view` 查看某插件的工具与技能后，再走 `tool_view` / `tool_exec` / `skill`。
+- 工具执行上下文由 `tool-context.js` 注入服务（配置、记忆、LLM、调度、技能、插件资产、Redis、日志、Bot、注入器），工具不直接依赖全局单例。
 
 内置工具按能力分组：
 
 - 文件系统：读、写、编辑、glob、grep；
-- Shell：PowerShell / Bash（master-only）；
+- Shell：PowerShell / Bash（bot_owner-only）；
 - Web：搜索、抓取；
 - 媒体：图片/视频/音频/文件处理；
-- Agent 元能力：技能加载、工具查看/执行、记忆检索/更新、知识库检索、定时任务；
-- 宿主操作：用户信息、互动、拉黑、群管理、miao 数据；
+- Agent 元能力：技能加载、插件查看、工具查看/执行、记忆检索/更新、知识库检索、定时任务；
+- 宿主操作：用户信息、互动、拉黑、群管理；
 - MCP：外部服务器工具。
 
 权限与边界：
 
-- `pwsh` / `bash` 仅 master 可执行；
-- 非 master 的文件工具被限制在 `data/aigc/chat`、`data/aigc/tmp`、`temp`、`skills`、`data/skills` 等目录；
+- `pwsh` / `bash` 仅 bot_owner 可执行；
+- 非 bot_owner 的文件工具被限制在 `data/aigc/chat`、`data/aigc/tmp`、`temp`、`skills`、`data/skills` 等目录；
 - 路径解析会拒绝越界与项目根目录操作；
 - 写入使用原子替换；
 - 工具参数做轻量 JSON Schema 校验；
@@ -530,7 +531,7 @@ AIGC 的入口是 `plugins/system/aigc.js`：
 
 技能是 `SKILL.md` + YAML frontmatter（`name`、`description`、可选 `tools`/`allowed-tools`）：
 
-- 系统提示词只列名称与描述；
+- 内置与用户技能在 `<skills>` 中列出名称与描述；插件技能不直接列出，先用 `plugin_view` 查看插件目录下的技能；
 - 模型通过 `skill` 工具加载正文与文件树；
 - 技能是操作说明，不是工具；
 - 内置 `skill-authoring` 说明如何编写技能。
@@ -606,8 +607,11 @@ AIGC 的入口是 `plugins/system/aigc.js`：
 
 插件可以随包提供 Agent 能力：
 
-- `plugins/<plugin>/agent/tools/*.js`：默认导出一个工具对象，注册到全局工具注册中心，来源 `plugin:<name>`，始终渐进式；
+- `plugins/<plugin>/agent/plugin.yaml`：必需，`description` 一行，告诉模型这个插件能做什么；缺失或为空时整个插件跳过。该描述展示在系统提示词的 `<plugins>` 目录中。
+- `plugins/<plugin>/agent/tools/*.js`：必须至少有一个工具成功注册，否则整个插件（含技能）跳过；技能可选，有则随插件一起加载并返回；工具默认导出一个工具对象，注册到全局工具注册中心，来源 `plugin:<name>`，始终渐进式；
 - `plugins/<plugin>/agent/skills/<name>/SKILL.md`：作为插件技能根注册，用户同名技能可覆盖。
+
+插件工具与技能不直接出现在系统提示词的 `<skills>` / `<available_tools>` 中；模型先看到 `<plugins>` 目录，再用 `plugin_view({ plugin })` 获取该插件的工具与技能列表。
 
 这些资产在插件加载后、监听器启动前统一扫描，因此插件不需要自己操作全局注册表。
 
@@ -618,7 +622,7 @@ AIGC 的入口是 `plugins/system/aigc.js`：
 宿主自带的插件与示例：
 
 - `plugins/adapter`：平台适配器。
-- `plugins/system`：主人设置、状态、AIGC 入口、WebUI 登录、好友/邀请、私聊限制、撤回、替换、Bot 上下线等。
+- `plugins/system`：master设置、状态、AIGC 入口、WebUI 登录、好友/邀请、私聊限制、撤回、替换、Bot 上下线等。
 - `plugins/other`：更新、重启、维护任务、版本、发送日志。
 - `plugins/example`：示例插件。
 
@@ -704,7 +708,7 @@ node-schedule → schedule 任务 → injectMessage
 | 新增 LLM 适配器 | `lib/ai_core/llm/<name>/adapter.js` + `llm/index.js` | 实现统一 `chat()` 契约，补充消息构建与能力声明 |
 | 新增 Embedding 适配器 | `lib/ai_core/embeddings/` | 实现 `embed()`，在配置解析中注册 |
 | 新增内置工具 | `lib/ai_core/tools/builtin/*.js` + `tools/index.js` | 副作用注册；声明 schema、权限、结果媒体字段 |
-| 新增插件工具 | `plugins/<plugin>/agent/tools/*.js` | 默认导出工具对象；始终渐进式加载 |
+| 新增插件工具 | `plugins/<plugin>/agent/tools/*.js` + `agent/plugin.yaml` | `plugin.yaml` 必需；至少一个工具成功注册，否则插件跳过；技能可选；工具始终渐进式加载 |
 | 新增技能 | `skills/<name>/SKILL.md` 或 `data/skills/` | 遵循 frontmatter 规范；用户技能覆盖内置/插件 |
 | 新增 TTS 服务商 | `lib/ai_core/output/tts/providers/` | 实现 `defaults` / `ready` / `tts`，注册到 provider 表 |
 | 新增 MCP Server | `aigc.yaml` 的 `mcp.servers` | 支持 stdio / http / sse；工具自动注册 |
@@ -722,7 +726,7 @@ node-schedule → schedule 任务 → injectMessage
 - **浏览器单例**：禁止直接启动 Chromium；所有渲染必须经过 `browser.runTask()` 并自行关闭 context。
 - **宿主与游戏插件源码耦合**：miao/genshin 的目录、import map、资源路径、模型导入都是硬依赖。
 - **更新会覆盖工作区**：`#更新`、`#全部更新`、维护任务可能执行 `git reset --hard`；插件目录中的未提交修改有丢失风险。
-- **AI 权限边界**：Shell 工具仅 master；非 master 文件访问被限制在固定目录；工具结果与历史消息按“不可信数据”处理。
+- **AI 权限边界**：Shell 工具仅 bot_owner；非 bot_owner 文件访问被限制在固定目录；工具结果与历史消息按“不可信数据”处理。
 - **提示词注入边界**：技能正文是操作说明；工具描述、工具结果、群聊历史、记忆内容只作为数据；系统生成的标签才可信。
 - **面向用户的中文**：注释、日志、回复、技能与插件文档以中文为主；代码风格遵循仓库 Prettier 配置。
 - **平台差异收敛在适配器**：插件层不应直接依赖 OneBot/QQBot 的原始事件结构，应使用统一事件字段。
@@ -740,5 +744,6 @@ pnpm test                               # 全量测试
 node --test --test-force-exit test/ai_core/tool-registry.test.js   # 单文件测试
 ```
 
+- 身份侧bot_owner = 系统侧master
 - 全量测试使用 `node --test --test-force-exit "test/**/*.test.js"`；`--test-force-exit` 用于避免配置监听器让测试进程无法退出。
 - 新增或修改 AI 子系统行为时，先跑全量测试；测试失败应优先判断是本次改动引入还是用例需要同步当前源码。

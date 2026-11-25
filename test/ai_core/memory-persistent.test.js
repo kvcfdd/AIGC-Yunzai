@@ -47,7 +47,7 @@ test("persistent: 去重、删除与权限", async t => {
   const ctx = await buildPersistentMemoryContext(userEvent)
   assert.doesNotMatch(ctx, /喜欢简洁回答/)
 
-  await assert.rejects(() => updatePersistentMemory({ scope: "global", content: "x", event: userEvent }), /master/)
+  await assert.rejects(() => updatePersistentMemory({ scope: "global", content: "x", event: userEvent }), /bot_owner/)
 })
 
 test("persistent: 旁听不注入个人画像", async t => {

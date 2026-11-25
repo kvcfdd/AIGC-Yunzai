@@ -1,52 +1,26 @@
 ---
 name: skill-authoring
-description: Create or update Agent Skills under data/skills; use when adding or fixing a skill.
-allowed-tools: read write edit glob grep
+description: Create or update self-authored skills under data/skills; use when adding or fixing a skill.
+allowed-tools: read write edit glob grep skill
 ---
 
 # Skill authoring
 
-Use this skill to create or update a self-authored Agent Skill. The open standard is at https://agentskills.io/specification. Skills are instructions loaded on demand; a skill cannot register tools, but a plugin can ship tools and skills together under `plugins/<plugin>/agent/`.
+Write self-authored skills to `data/skills/<name>/SKILL.md`. A skill with the same `name` overrides a built-in or plugin skill; plugin skill directories are read-only. A skill is instructions only — it cannot register tools.
 
-## Where skills live in this bot
-
-- Self-authored skill: `data/skills/<name>/SKILL.md` — write here.
-- Built-in skill: `skills/<name>/SKILL.md` — reference only; a user skill overrides a built-in with the same `name`.
-- Plugin skill: `plugins/<plugin>/agent/skills/<name>/SKILL.md` — shipped and versioned with the plugin; read-only. A user skill in `data/skills/` overrides it.
-- `skill-authoring` is the only built-in skill; do not shadow it unless the operator asks.
-
-Standard directory layout (only `SKILL.md` is required):
-
-```
-<name>/
-├── SKILL.md          # metadata + instructions
-├── scripts/          # optional executable code
-├── references/       # optional documentation loaded on demand
-└── assets/           # optional templates and resources
-```
+Only `SKILL.md` is required. Optional directories: `scripts/`, `references/`, `assets/`.
 
 ## Frontmatter
 
-Must be the first content in the file, delimited by `---`. Standard fields:
+Must be the first block, delimited by `---`.
 
 | Field | Required | Rules |
 |---|---|---|
-| `name` | yes | 1-64 chars; lowercase `a-z`, digits, `-`; no leading/trailing `-`; no `--`; must equal the directory name |
-| `description` | yes | 1-1024 chars; say what the skill does and when to use it, with trigger keywords |
-| `license` | no | license name or reference to a bundled license file |
-| `compatibility` | no | 1-500 chars; environment requirements |
-| `metadata` | no | string-to-string map for extra fields |
-| `allowed-tools` | no | space-separated tools the skill expects (experimental in the standard) |
+| `name` | yes | lowercase letters, digits, `-`; must equal the directory name |
+| `description` | yes | one line: what it does and when to use it; include trigger keywords |
+| `tools` / `allowed-tools` | no | tool names, comma- or space-separated |
 
-This bot's parser additions and limits:
-
-- Accepts `tools` as an alias of `allowed-tools` (comma- or space-separated).
-- Access control is enforced by the action tools at execution time: `pwsh`/`bash` are master-only; `read`/`glob`/`grep`/`write`/`edit` are open to all users, but non-master `write`/`edit` are limited to `data/aigc/chat`, `data/aigc/tmp`, `temp`, `skills` and `data/skills`, while `read`/`glob`/`grep` may also read `plugins/miao-plugin/resources` and registered plugin skill directories; skills themselves are readable by any caller with the `skill` tool.
-- The system-prompt skill list shows `name` and `description`; the body is not included.
-- `license`, `compatibility`, and `metadata` are accepted but not surfaced by this bot.
-- Malformed YAML falls back silently to the directory name and the first body line; always set `name` and `description` explicitly.
-
-Minimal example:
+Malformed frontmatter falls back to the directory name and first body line, so always set `name` and `description`.
 
 ```md
 ---
@@ -57,44 +31,32 @@ allowed-tools: read write
 
 # My skill
 
-Steps the agent follows after activation.
+Steps to follow after activation.
 ```
 
-## Progressive disclosure
+## Body
 
-1. Startup: only `name` + `description` load for every skill.
-2. Activation: the full `SKILL.md` body loads, with no hard size cap. Keep it under 500 lines / ~5,000 tokens so it stays cheap to load.
-3. Resources: `scripts/`, `references/`, and `assets/` load only when needed. Tell the reader exactly when to load each file, for example: "Read `references/api-errors.md` when a request returns non-200."
-
-Reference files with relative paths from the skill root and keep references one level deep.
-
-## Writing the body
-
-- Add what the agent would not know: project conventions, exact commands/paths, non-obvious edge cases.
-- Prefer short, ordered procedures and one working example over exhaustive prose.
-- Give a default instead of a menu of equal options; mention alternatives as escape hatches.
-- Include a "Gotchas" section for mistakes the agent will make without being told.
-- Include a verification step for fragile or destructive work.
-- State what not to touch and when to stop and ask the operator.
+- Write only what the agent would not already know: project conventions, exact commands and paths, non-obvious edge cases.
+- Prefer short ordered steps and one working example over exhaustive prose.
+- Reference resource files with relative paths and say when to load each; keep them one level deep.
+- Add a gotchas section for mistakes the agent will make without being told.
+- Include verification for fragile or destructive work; state what not to touch and when to ask.
+- The full body loads on activation, so keep it under ~500 lines.
 - Never store secrets, tokens, personal data, or large logs.
 
 ## Workflow
 
-1. Read the current skill list from the system prompt; inspect an existing skill with the `skill` tool.
-2. Pick a lowercase hyphenated name equal to the directory name; confirm it is unused in the system prompt skill list (which includes built-in, plugin and user skills), or with `glob` under `skills/`, `plugins/*/agent/skills/` and `data/skills/` when accessible.
-   For a plugin skill, declare the plugin's tool names in `tools`; the `skill` tool reports them to the model.
-3. Write `data/skills/<name>/SKILL.md` with `write`.
-4. Validate:
-   - Standard check, if available: `skills-ref validate data/skills/<name>`.
-   - Bot check: read the file back, then load it with the `skill` tool.
-5. The skill list is cached for 60 seconds: a new skill may not appear through `skill` immediately; wait for the cache or read the file directly. Editing an existing body takes effect immediately.
-6. After real use, add corrections to the gotchas section.
+1. Pick an unused lowercase hyphenated name.
+2. Write `data/skills/<name>/SKILL.md`.
+3. Read it back, then load it with the `skill` tool.
+4. The skill list is cached for 60 seconds, so a new skill may not appear immediately; editing an existing body takes effect at once.
+5. After real use, fold corrections into the gotchas.
 
 ## Anti-patterns
 
-- Duplicating a built-in skill without adding value.
 - Vague descriptions such as "helps with tasks" — they never trigger.
-- Declaring tools the current user cannot use.
-- Editing a plugin's skill in place; copy it to `data/skills/` to override it instead.
-- A body that restates general knowledge instead of project-specific procedure.
-- Keeping mutable state or generated output inside the skill directory; use project data paths instead.
+- Restating general knowledge instead of project-specific procedure.
+- Duplicating a built-in skill without adding value.
+- Editing a plugin skill in place instead of overriding it in `data/skills/`.
+- Declaring tools the caller cannot use.
+- Keeping mutable state or generated output inside the skill directory.
