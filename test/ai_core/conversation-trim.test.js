@@ -20,9 +20,14 @@ const originals = {
   clearContext: store.clearContext,
   clearContextMessages: store.clearContextMessages,
   clearAll: store.clearAll,
+  clearAllChunked: store.clearAllChunked,
   clearAllContext: store.clearAllContext,
+  clearAllContextChunked: store.clearAllContextChunked,
   clearOrphanContext: store.clearOrphanContext,
+  clearOrphanContextChunked: store.clearOrphanContextChunked,
+  clearExpiredContextChunked: store.clearExpiredContextChunked,
   deleteTurnsBefore: store.deleteTurnsBefore,
+  deleteTurnsBeforeChunked: store.deleteTurnsBeforeChunked,
 }
 after(() => {
   Object.assign(store, originals)
@@ -82,14 +87,32 @@ function mockStore() {
   store.clearAll = () => {
     rows = []
   }
+  store.clearAllChunked = async () => {
+    rows = []
+  }
   store.clearAllContext = () => {
+    context = []
+  }
+  store.clearAllContextChunked = async () => {
     context = []
   }
   store.clearOrphanContext = () => {
     if (!rows.length) context = []
     return context.length
   }
+  store.clearOrphanContextChunked = async () => {
+    if (!rows.length) context = []
+    return context.length
+  }
+  store.clearExpiredContextChunked = async () => {
+    const cutoff = Date.now() - 30 * 86400000
+    const before = context.length
+    const latest = Math.max(0, ...rows.filter(row => row.created_at >= cutoff).map(row => row.turn))
+    context = context.filter(row => row.role === "summary" || row.turn >= latest)
+    return before - context.length
+  }
   store.deleteTurnsBefore = () => 0
+  store.deleteTurnsBeforeChunked = async () => 0
 }
 
 beforeEach(() => {
@@ -212,7 +235,7 @@ test("清理会话时同时清理历史表、上下文表与 token 计数", asyn
 test("30 天清理后历史已空的会话同时清除实际上下文", async () => {
   rows = []
   context = [{ turn: 0, seq: 0, role: "summary", content: "摘要", payload: "{}" }]
-  store.deleteTurnsBefore = () => 1
+  store.deleteTurnsBeforeChunked = async () => 1
   assert.equal(await memory.pruneOld(30), 1)
   assert.equal(context.length, 0)
 })
@@ -227,7 +250,7 @@ test("30 天清理时仍有近期消息的会话清除已过期的实际上下�
     { turn: 1, seq: 0, role: "user", content: "旧上下文", payload: "{}" },
     { turn: 2, seq: 0, role: "user", content: "近期上下文", payload: "{}" },
   ]
-  store.deleteTurnsBefore = () => 1
+  store.deleteTurnsBeforeChunked = async () => 1
   assert.equal(await memory.pruneOld(30), 1)
   const loaded = await memory.getMessages("s", "u")
   assert.equal(loaded.summary, "旧摘要")
