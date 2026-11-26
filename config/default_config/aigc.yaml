@@ -176,7 +176,9 @@ voice:
       break_clone: true
       preset: balance
       speech_rate: 1
+      timeout_ms: 30000
       # 通用字段: proxy, api_keys
+      # wusound: base_url, voice_id, break_clone, preset, speech_rate, timeout_ms
       # openai: base_url, model, voice, response_format, speed, timeout_ms, headers
       # deepseek: base_url, voice_id, format, filter_markdown, timeout_ms
       # gemini: base_url, model, voice, prefix, timeout_ms
